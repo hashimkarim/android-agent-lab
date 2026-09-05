@@ -1,0 +1,4 @@
+interface:
+  display_name: "ADB Coordination"
+  short_description: "Share Android devices safely across agent threads"
+  default_prompt: "Use $adb-coordination to claim an Android device, test the app, and open a device preview."

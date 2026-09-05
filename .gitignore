@@ -1,0 +1,10 @@
+.env
+.venv/
+node_modules/
+__pycache__/
+.pytest_cache/
+*.pyc
+artifacts/
+*.apk
+*.log
+.lab/

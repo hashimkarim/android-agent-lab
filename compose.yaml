@@ -1,0 +1,40 @@
+name: android-agent-lab
+services:
+  emulator:
+    # Upstream supplies Android, ADB, desktop input, and the noVNC browser client.
+    build: .
+    image: android-agent-lab:android-16
+    platform: linux/amd64
+    devices:
+      - /dev/kvm:/dev/kvm
+    environment:
+      EMULATOR_DEVICE: Pixel 9
+      EMULATOR_NO_SKIN: "true"
+      # Upstream's 550 MB default fills during modern Android's first boot.
+      EMULATOR_DATA_PARTITION: "8g"
+      WEB_VNC: "true"
+      SCREEN_WIDTH: "540"
+      SCREEN_HEIGHT: "960"
+      USER_BEHAVIOR_ANALYTICS: "false"
+      # Lavapipe avoids the SwiftShader crash observed on the validation host.
+      # Modern mapper readback requires both memory features; touch needs its device.
+      EMULATOR_ADDITIONAL_ARGS: "${EMULATOR_ARGS:--no-snapshot -no-audio -no-boot-anim -no-metrics -screen multi-touch -gpu lavapipe -feature -ModemSimulator,GLDirectMem,HasSharedSlotsHostMemoryAllocator}"
+      VNC_PASSWORD: "${VNC_PASSWORD:?Run python3 scripts/lab.py init first}"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8765}:6080"
+      - "127.0.0.1:${ADB_PORT:-15555}:5555"
+    shm_size: 1gb
+    mem_limit: 6g
+    volumes:
+      - android16-avd:/home/androidusr/emulator
+      - android16-config:/home/androidusr/.android
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 180s
+      retries: 12
+    stop_grace_period: 30s
+volumes:
+  android16-avd:
+  android16-config:
