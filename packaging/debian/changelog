@@ -1,3 +1,9 @@
+android-agent-lab (0.2.0-1ppa2) noble; urgency=medium
+
+  * Normalize bundled timestamps to the release date for Launchpad publication.
+
+ -- Hashim Karim <hashimkarim168@gmail.com>  Sat, 05 Sep 2026 23:45:00 +0200
+
 android-agent-lab (0.2.0-1ppa1) noble; urgency=medium
 
   * Initial Ubuntu package from the verified upstream desktop bundles.

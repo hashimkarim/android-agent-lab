@@ -1,6 +1,7 @@
 #!/usr/bin/make -f
 
 include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/pkg-info.mk
 VERSION := $(shell dpkg-parsechangelog -S Version | cut -d- -f1)
 BUNDLE_ARCH := $(if $(filter arm64,$(DEB_HOST_ARCH)),arm64,x64)
 DEST := debian/android-agent-lab
@@ -22,6 +23,9 @@ override_dh_auto_install:
 	install -Dm644 packaging/common/android-agent-lab.desktop $(DEST)/usr/share/applications/android-agent-lab.desktop
 	install -Dm644 packaging/common/android-agent-lab.png $(DEST)/usr/share/icons/hicolor/256x256/apps/android-agent-lab.png
 	dh_apparmor --profile-name=android-agent-lab
+	# Upstream uses epoch-zero directories for reproducible staging; Launchpad
+	# rejects them. Normalize metadata to the release date without changing bytes.
+	find $(DEST) -exec touch --no-dereference --date="@$(SOURCE_DATE_EPOCH)" {} +
 
 override_dh_fixperms:
 	dh_fixperms
