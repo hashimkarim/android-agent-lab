@@ -1,4 +1,6 @@
 import {WebCodecsVideoDecoder, BitmapVideoFrameRenderer} from '@yume-chan/scrcpy-decoder-webcodecs';
+// Opening a new session URL in the same tab may only change its fragment.
+window.addEventListener('hashchange', () => location.reload());
 const key = new URLSearchParams(location.hash.slice(1)).get('key');
 const canvas = document.querySelector('#screen'), status = document.querySelector('#status');
 let decoder, writer, settings, socket, startPoint, inputQueue = Promise.resolve(), queued = 0;

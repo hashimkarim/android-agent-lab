@@ -2,8 +2,8 @@
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Android Agent Lab · Live device</title><link rel="stylesheet" href="/style.css">
 <header><strong>Android Agent Lab</strong><span id="device">Connecting…</span></header>
-<nav aria-label="Device controls"><button data-key="BACK">Back</button><button data-key="HOME">Home</button><button data-key="APP_SWITCH">Recents</button><button id="reload">Reconnect</button></nav>
+<nav aria-label="Device controls"><button data-key="BACK" disabled>Back</button><button data-key="HOME" disabled>Home</button><button data-key="APP_SWITCH" disabled>Recents</button><button id="reload">Reconnect</button></nav>
 <main><canvas id="screen" tabindex="0" aria-label="Live Android screen"></canvas><p id="status" role="status">Starting video…</p></main>
-<form id="text-form"><input id="text" aria-label="Text to send to Android" placeholder="Text to send to Android" autocomplete="off"><button>Send</button></form>
+<form id="text-form"><input id="text" aria-label="Text to send to Android" placeholder="Text to send to Android" autocomplete="off" disabled><button disabled>Send</button></form>
 <footer>Click or drag on the screen. Human and agent input share this device.</footer>
 <script type="module" src="/client.js"></script></html>
