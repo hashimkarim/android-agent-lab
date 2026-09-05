@@ -1,0 +1,4 @@
+#!/bin/sh
+# Coding tools may export this; the launcher must start the desktop application.
+unset ELECTRON_RUN_AS_NODE
+exec /opt/android-agent-lab/android-agent-lab "$@"

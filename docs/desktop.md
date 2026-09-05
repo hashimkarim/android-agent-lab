@@ -1,6 +1,8 @@
 # Linux desktop app
 
 Download an installer from [Releases](https://github.com/Hashim-K/android-agent-lab/releases).
+For package manager installation and updates, see the
+[AUR, Homebrew, COPR, and Ubuntu PPA instructions](distribution.md).
 The app includes Chromium, Node, the scrcpy server, the viewer, and the coordination
 skill. It opens a normal desktop window and serves the **same Android screen** on
 a private localhost browser port. Agent cursors appear in both views.
@@ -148,6 +150,8 @@ checksum verified and its upstream license is included, alongside Electron and
 JavaScript dependency licenses. No Android system image is bundled in the desktop
 download; Docker retrieves the emulator separately on first setup.
 
-Release workflows attach installers and `SHA256SUMS`. These are direct-download
-packages, not submissions to the AUR, Flathub, Snap Store, or distro repositories.
-Updates are manual; no background updater is enabled.
+Release workflows attach installers and `SHA256SUMS`. The AUR, Homebrew tap,
+Fedora COPR, and Ubuntu PPA have separate [distribution recipes](distribution.md).
+These are community channels maintained by this project. There is no Flathub or
+Snap Store submission. Package manager installations update through their package
+manager; direct downloads are updated manually. No background updater is enabled.

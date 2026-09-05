@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Android Agent Lab
+Comment=Shared Android devices, scrcpy video, and visible agent cursors
+Exec=android-agent-lab %U
+Icon=android-agent-lab
+Terminal=false
+StartupWMClass=android-agent-lab
+Categories=Development;Utility;
+Keywords=Android;ADB;Emulator;scrcpy;Codex;Claude;

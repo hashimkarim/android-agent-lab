@@ -20,6 +20,8 @@ launcher discovers devices, starts the Android 16 emulator, and opens the same
 scrcpy viewer used by browser previews. Share a session's private browser URL or
 agent instructions to work together with named cursors on one Android screen.
 See [installation, requirements, and building](docs/desktop.md).
+Package manager channels are available through the
+[AUR, Homebrew tap, Fedora COPR, and Ubuntu PPA](docs/distribution.md).
 
 ## Start from source
 

@@ -1,0 +1,6 @@
+android-agent-lab (0.2.0-1ppa1) noble; urgency=medium
+
+  * Initial Ubuntu package from the verified upstream desktop bundles.
+  * Include the Chromium AppArmor profile and shared coordination skill.
+
+ -- Hashim Karim <hashimkarim168@gmail.com>  Sat, 05 Sep 2026 12:00:00 +0200
