@@ -60,6 +60,11 @@ drag, type, and use Back/Home/Recents. The browser decodes H.264 from the offici
 scrcpy Android server; a native desktop window is optional. The viewer also
 accepts a physical phone's serial and needs no Docker for that case.
 
+**Agent cursors** show where coordinated agent taps and drags happen, with
+separate names and colors in every browser view. Typing and navigation appear
+as activity labels. Use **Show cursors** to hide the overlay; see
+[cursor attribution](docs/streaming.md#agent-cursors) for shared-session labels.
+
 Omit `--control` for read-only video. Every input checks the shared claim;
 handoff or expiry stops the old stream. Video alone does not renew ownership.
 Ctrl+C stops the viewer, leaving the device and claim intact. Current browser

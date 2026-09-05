@@ -3,7 +3,7 @@
 <title>Android Agent Lab · Live device</title><link rel="stylesheet" href="/style.css">
 <header><strong>Android Agent Lab</strong><span id="device">Connecting…</span></header>
 <nav aria-label="Device controls"><button data-key="BACK" disabled>Back</button><button data-key="HOME" disabled>Home</button><button data-key="APP_SWITCH" disabled>Recents</button><button id="reload">Reconnect</button></nav>
-<main><canvas id="screen" tabindex="0" aria-label="Live Android screen"></canvas><p id="status" role="status">Starting video…</p></main>
+<main><div id="device-frame"><canvas id="screen" tabindex="0" aria-label="Live Android screen"></canvas><canvas id="cursors" aria-hidden="true"></canvas></div><p id="status" role="status">Starting video…</p><div class="activity-bar"><label><input id="show-cursors" type="checkbox" checked> Show cursors</label><span id="activity" role="status">Agent cursors ready</span></div></main>
 <form id="text-form"><input id="text" aria-label="Text to send to Android" placeholder="Text to send to Android" autocomplete="off" disabled><button disabled>Send</button></form>
 <footer>Click or drag on the screen. Human and agent input share this device.</footer>
 <script type="module" src="/client.js"></script></html>

@@ -1,9 +1,20 @@
 import {WebCodecsVideoDecoder, BitmapVideoFrameRenderer} from '@yume-chan/scrcpy-decoder-webcodecs';
+import {createCursors} from './cursors.js';
 // Opening a new session URL in the same tab may only change its fragment.
 window.addEventListener('hashchange', () => location.reload());
 const key = new URLSearchParams(location.hash.slice(1)).get('key');
+const browserActor = sessionStorage.getItem('adb-video-actor') || `human:browser-${crypto.randomUUID().slice(0,8)}`;
+sessionStorage.setItem('adb-video-actor', browserActor);
+const actor = new URLSearchParams(location.hash.slice(1)).get('actor') || browserActor;
 const canvas = document.querySelector('#screen'), status = document.querySelector('#status');
 let decoder, writer, settings, socket, startPoint, inputQueue = Promise.resolve(), queued = 0;
+function dimensions() {
+  if (!settings) return null;
+  let {width,height} = settings;
+  if ((canvas.width > canvas.height) !== (width > height)) [width,height]=[height,width];
+  return {width,height};
+}
+const cursors = createCursors(document.querySelector('#cursors'), canvas, document.querySelector('#show-cursors'), document.querySelector('#activity'), actor, dimensions);
 async function api(path, data) {
   const response = await fetch(path, {method:data ? 'POST':'GET', headers:{'X-ADB-Preview-Key':key || '', ...(data ? {'Content-Type':'application/json'}:{})}, ...(data ? {body:JSON.stringify(data)}:{})});
   const result = await response.json();
@@ -14,14 +25,13 @@ function send(data) {
   if (!settings?.control) return Promise.resolve(false);
   if (queued >= 20) {status.textContent='Input queue is full; wait before sending more.';return Promise.resolve(false);}
   queued++;
-  const result = inputQueue.then(() => api('/input', data));
+  const result = inputQueue.then(() => api('/input', {...data,actor}));
   inputQueue = result.catch(e => status.textContent=e.message).finally(() => queued--);
   return result.then(() => true, () => false);
 }
 function point(event) {
   const r = canvas.getBoundingClientRect();
-  let {width, height} = settings;
-  if ((canvas.width > canvas.height) !== (width > height)) [width,height] = [height,width];
+  const {width,height} = dimensions();
   return {x:Math.max(0,Math.min(width-1,Math.round((event.clientX-r.left)/r.width*width))),
     y:Math.max(0,Math.min(height-1,Math.round((event.clientY-r.top)/r.height*height)))};
 }
@@ -54,9 +64,11 @@ try {
   let decoding = Promise.resolve();
   socket.onmessage = event => {
     if (typeof event.data==='string') {
-      decoder = new WebCodecsVideoDecoder({codec:JSON.parse(event.data).codec, renderer:new BitmapVideoFrameRenderer(canvas)});
+      const message = JSON.parse(event.data);
+      if (message.type === 'activity') {cursors.receive(message);return;}
+      decoder = new WebCodecsVideoDecoder({codec:message.codec, renderer:new BitmapVideoFrameRenderer(canvas)});
       writer=decoder.writable.getWriter();
-      decoder.sizeChanged(({width,height}) => {canvas.width=width;canvas.height=height;});
+      decoder.sizeChanged(({width,height}) => {if ((canvas.width>canvas.height)!==(width>height)) cursors.clear();canvas.width=width;canvas.height=height;});
       status.textContent=settings.control ? 'Live video · click the screen to focus keyboard input' : 'Live video · read-only';
       return;
     }
@@ -65,6 +77,7 @@ try {
     decoding=decoding.then(() => writer.write(packet)).catch(e => {status.textContent=e.message;socket.close();});
   };
   socket.onclose = () => {
+    cursors.clear();
     settings.control=false;
     document.querySelectorAll('[data-key], #text-form input, #text-form button').forEach(e => e.disabled=true);
     status.textContent='Video stopped. Check the device claim, then reconnect.';

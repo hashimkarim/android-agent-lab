@@ -36,6 +36,29 @@ are not implemented. Agent actions still use the normal coordinated ADB
 wrapper. Use screenshots or Android UI hierarchy for native widget semantics;
 the browser DOM only describes the viewer controls and canvas.
 
+## Visible agent cursors
+
+The updated coordinator emits named pointer feedback for direct
+`shell input tap/swipe/text/keyevent` commands. The browser shows tap markers,
+drag paths, and typing/navigation activity; it never receives typed characters
+in these feedback events. Markers fade after eight seconds and turn red when
+an input command fails. This is input feedback, not proof of an app response.
+
+The default actor is the claim owner. When using a shared session, set
+`ADB_COORD_ACTOR='codex:THREAD_ID'` (or `claude:`/`t3:`) in this thread's process,
+or pass `--actor` to `adb_coord.py run` before `--`. Keep the valid claim token;
+the actor only labels the cursor and does not grant ownership. Browser-driven
+agents should append a URL-encoded actor to the existing private fragment,
+for example `#key=...&actor=codex%3Athread-id`. Ordinary browser input defaults
+to a human actor. Do not label agent automation as human input.
+
+The overlay is local to the browser and does not intercept clicks or add Android
+commands. It is absent from native scrcpy and Android screenshots. Unwrapped
+ADB and complex shell scripts do not emit these markers. Use native screenshots
+or UI hierarchy to confirm the app's actual response.
+
+## Ownership and cleanup
+
 Every browser input takes the shared operation lock and rechecks the token.
 Passive video does not renew the claim. Humans and agents should take turns
 when screen state matters. Handing off rotates the token and stops the old

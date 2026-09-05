@@ -63,7 +63,8 @@ def rpc():
     data = json.loads(sys.stdin.buffer.read(4097))
     if not config['control']:
         raise coord.CoordinationError('This viewer is read-only')
-    result = coord.run_adb(config['serial'], config['token'], video_input(data), timeout=15, capture=True)
+    actor = coord.activity_actor(data.get('actor', 'human:browser')) if isinstance(data, dict) else None
+    result = coord.run_adb(config['serial'], config['token'], video_input(data), timeout=15, capture=True, actor=actor)
     if result.returncode:
         raise coord.CoordinationError(result.stderr.decode(errors='replace') or 'Device input failed')
     print(json.dumps({'ok': True}))
@@ -92,7 +93,7 @@ def start(args):
             if not dimensions:
                 raise coord.CoordinationError('Cannot determine device display size')
             width, height = map(int, dimensions[-1])
-            config = dict(serial=args.serial, token=args.token, record=str(path), server=coord.server_id(),
+            config = dict(serial=args.serial, token=args.token, record=str(path), activity=str(path.with_suffix('.activity')), server=coord.server_id(),
                           endpoint=endpoint(coord.server_id()), key=secrets.token_urlsafe(32), port=args.port,
                           control=args.control, maxSize=args.max_size, maxFps=args.max_fps,
                           width=width, height=height, serverFile=str(SERVER), python=sys.executable, supervisor=os.getpid())

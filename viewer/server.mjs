@@ -2,7 +2,7 @@
 import {createServer} from 'node:http';
 import {readFileSync} from 'node:fs';
 import {spawn} from 'node:child_process';
-import {timingSafeEqual} from 'node:crypto';
+import {timingSafeEqual, createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {WebSocketServer, WebSocket} from 'ws';
 import {AdbServerClient} from '@yume-chan/adb';
@@ -80,10 +80,32 @@ server.on('upgrade', (req, socket, head) => {
   wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws));
 });
 let metadata, configuration, group = [], groupSize = 0, groupValid = false;
+const activitySession = createHash('sha256').update(config.token).digest('hex');
+const seenActivity = new Set();
+let recentActivity = [];
+function sendActivity(ws, events) {
+  if (events.length && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'activity', events, now:Date.now()}));
+}
+setInterval(() => {
+  if (!owns()) return;
+  try {
+    const state = JSON.parse(readFileSync(config.activity, 'utf8'));
+    if (state.session !== activitySession || !Array.isArray(state.events)) return;
+    recentActivity = state.events.filter(e => typeof e.at === 'number' && e.at * 1000 > Date.now() - 8000).slice(-32);
+    const fresh = recentActivity.filter(e => !seenActivity.has(`${e.id}:${e.phase}`));
+    for (const e of fresh) seenActivity.add(`${e.id}:${e.phase}`);
+    if (seenActivity.size > 128) {
+      seenActivity.clear();
+      for (const e of recentActivity) seenActivity.add(`${e.id}:${e.phase}`);
+    }
+    for (const ws of wss.clients) sendActivity(ws, fresh);
+  } catch { /* Feedback is optional; video keeps streaming without an activity file. */ }
+}, 75).unref();
 wss.on('connection', ws => {
   ws.send(JSON.stringify(metadata));
   if (configuration) ws.send(configuration);
   if (groupValid) for (const frame of group) ws.send(frame);
+  sendActivity(ws, recentActivity.filter(e => e.at * 1000 > Date.now() - 8000));
 });
 async function stop(code=0) {
   if (ending) return;
@@ -108,7 +130,7 @@ try {
   client.output.pipeTo(new WritableStream({write(line) {process.stderr.write(`[scrcpy] ${line}\n`);}})).catch(() => {});
   client.exited.then(() => stop()).catch(() => stop(1));
   const video = await client.videoStream;
-  metadata = {codec:video.metadata.codec};
+  metadata = {type:'video', codec:video.metadata.codec};
   await new Promise(resolve => server.listen(config.port, '127.0.0.1', resolve));
   process.stdout.write(JSON.stringify({url:`http://127.0.0.1:${server.address().port}/#key=${config.key}`, serial:config.serial, control:config.control})+'\n');
   await video.stream.pipeTo(new WritableStream({write(packet) {

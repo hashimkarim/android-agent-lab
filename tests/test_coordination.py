@@ -25,6 +25,8 @@ class CoordinationTests(unittest.TestCase):
 import json, os, sys, time
 from pathlib import Path
 Path(os.environ['FAKE_LOG']).write_text(json.dumps(sys.argv[1:]))
+while os.environ.get('FAKE_GATE') and not Path(os.environ['FAKE_GATE']).exists():
+ time.sleep(.01)
 time.sleep(float(os.environ.get('FAKE_DELAY','0')))
 if sys.argv[-3:] == ['exec-out','screencap','-p']:
  import base64

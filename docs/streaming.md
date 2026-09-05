@@ -47,6 +47,39 @@ audio, clipboard sync, arbitrary Unicode/IME input, and the literal sequence
 `%s` in text are not implemented. Restart the viewer after changing Android's
 display resolution. Rotation is mapped from the streamed frame orientation.
 
+### Agent cursors
+
+**Show cursors** displays named, colored pointers for coordinated agent taps
+and swipe paths in every connected browser view. Markers fade after eight
+seconds; failed input turns red. Typing and navigation appear in the activity
+line without exposing typed characters. These mark input attempts, not mouse
+hover or proof that the app handled an action.
+
+Agent commands through `lab.py adb` or the updated `adb_coord.py run` emit this
+feedback automatically, using the claim owner's label. To identify an agent
+working in a shared session, keep the valid token and set its display actor:
+
+```bash
+python3 skills/adb-coordination/scripts/adb_coord.py run --serial SERIAL --token TOKEN --actor 'codex:thread-id' -- shell input tap 500 800
+ADB_COORD_ACTOR='claude:thread-id' python3 scripts/lab.py adb --token TOKEN -- shell input swipe 500 1200 500 400 300
+```
+
+Browser input gets a human label by default. For an agent driving the browser,
+append `&actor=codex%3Athread-id` to the private URL's existing `#key=...`
+fragment. The actor is a display label; it does not change ownership or grant
+access. Distinct thread labels retain distinct pointers. All viewers still
+operate the same Android screen.
+
+The cursor layer runs in the browser, independently of the video canvas. It
+adds no Android commands or video re-encoding and pauses drawing while markers
+are stationary. It remains outside native scrcpy, noVNC, and Android screenshots.
+A native overlay is deferred pending performance validation. Raw ADB, native
+scrcpy input, and complex shell scripts that bypass the coordinator do not
+produce these named markers. Direct `shell input tap/swipe/text/keyevent`
+commands are recognized; a cursor is not guessed for other shell commands.
+
+### Shared input and lifecycle
+
 The video connection observes the active claim without extending its lifetime.
 Every browser input goes through the Python coordinator's per-device lock and
 renews the claim, just like agent ADB commands. This keeps ownership checks
@@ -116,6 +149,13 @@ claim handoff revoked old-token input and closed the active stream/listener;
 read-only mode rejected input, and SIGTERM/SIGKILL cleanup left no Android
 scrcpy server process. HTTP access-key, Host, and Origin checks also passed. Physical-device video uses the
 same explicit-serial path but has not been exercised on a phone in this release.
+
+Cursor validation used two browser clients connected to the same emulator:
+coordinated CLI input and browser input produced separate actor labels at the
+correct screen coordinates. Drag feedback, click-through behavior, resize,
+visibility toggling, and expiry passed without browser errors. Automated tests
+also cover attribution, rejected claims, failed input, handoff isolation,
+bounded feedback storage, and omission of typed text.
 
 The project reuses upstream capture and decoding instead of maintaining a
 scrcpy fork. [NetrisTV/ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) offers

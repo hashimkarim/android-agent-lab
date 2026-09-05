@@ -9,6 +9,7 @@ import math
 import os
 from pathlib import Path
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -77,14 +78,15 @@ def read_record(path):
         raise CoordinationError(f"Cannot read claim {path}: {exc}; do not bypass coordination.") from exc
 
 
-def save_record(path, record):
+def save_record(path, record, *, durable=True):
     fd, temp = tempfile.mkstemp(dir=path.parent, prefix=".claim-")
     try:
         with os.fdopen(fd, "w") as out:
             json.dump(record, out, indent=2)
             out.write("\n")
-            out.flush()
-            os.fsync(out.fileno())
+            if durable:
+                out.flush()
+                os.fsync(out.fileno())
         os.replace(temp, path)
     finally:
         if os.path.exists(temp):
@@ -151,7 +153,77 @@ DEVICE_COMMANDS = {"shell", "exec-out", "install", "install-multiple", "install-
                    "get-state", "get-serialno", "get-devpath", "wait-for-device", "emu"}
 
 
-def run_adb(serial, token, args, timeout=120, *, capture=False, renew=True):
+def input_activity(args):
+    """Describe direct input only; never retain shell text or typed characters."""
+    if not args or args[0] != "shell":
+        return None
+    parts = args[1:]
+    if len(parts) == 1:
+        try:
+            parts = shlex.split(parts[0])
+        except ValueError:
+            return None
+    if parts[:1] != ["input"]:
+        return None
+    parts = parts[1:]
+    if parts[:1] and parts[0] in {"touchscreen", "mouse", "stylus", "keyboard"}:
+        parts = parts[1:]
+    if not parts:
+        return None
+    kind, values = parts[0], parts[1:]
+    if kind in {"tap", "swipe"}:
+        count = 2 if kind == "tap" else 4
+        if len(values) not in ({2} if kind == "tap" else {4, 5}):
+            return None
+        try:
+            points = [float(v) for v in values[:count]]
+            duration = float(values[4]) if kind == "swipe" and len(values) == 5 else 300
+        except ValueError:
+            return None
+        if not all(math.isfinite(n) and 0 <= n <= 16384 for n in points):
+            return None
+        if not math.isfinite(duration) or not 0 <= duration <= 60000:
+            return None
+        return {"kind": kind, "points": points, "duration": duration if kind == "swipe" else 0}
+    if kind == "text" and len(values) == 1:
+        return {"kind": "typing"}
+    if kind == "keyevent" and values:
+        # Named navigation is useful; character keycodes could reveal a password.
+        names = {"BACK": "Back", "HOME": "Home", "APP_SWITCH": "Recents",
+                 "ENTER": "Enter", "TAB": "Tab", "DEL": "Backspace",
+                 "DPAD_LEFT": "Left", "DPAD_RIGHT": "Right", "DPAD_UP": "Up", "DPAD_DOWN": "Down"}
+        return {"kind": "key", "key": names.get(values[-1].removeprefix("KEYCODE_"), "Key input")}
+    return None
+
+
+def activity_actor(value):
+    if not isinstance(value, str) or not value.strip() or len(value) > 80 or any(ord(c) < 32 or ord(c) == 127 for c in value):
+        raise CoordinationError("Cursor actor must be a nonempty label of at most 80 characters.")
+    return value.strip()
+
+
+def publish_activity(path, record, event):
+    """Bounded, private feedback; callers hold the device lock. Never fail ADB."""
+    path = path.with_suffix(".activity")
+    session = hashlib.sha256(record["token"].encode()).hexdigest()
+    try:
+        try:
+            previous = json.loads(path.read_text())
+        except (FileNotFoundError, ValueError):
+            previous = {}
+        events = previous.get("events", []) if isinstance(previous, dict) and previous.get("session") == session else []
+        if not isinstance(events, list):
+            events = []
+        cutoff = time.time() - 10
+        events = [e for e in events[-31:] if isinstance(e, dict) and isinstance(e.get("at"), (int, float)) and e["at"] > cutoff]
+        events.append({**event, "at": time.time()})
+        save_record(path, {"session": session, "events": events}, durable=False)
+    except OSError:
+        # A viewer must not make a device operation fail when feedback is unavailable.
+        pass
+
+
+def run_adb(serial, token, args, timeout=120, *, capture=False, renew=True, actor=None):
     if not args or args[0] not in DEVICE_COMMANDS:
         raise CoordinationError("Use a device command after --; server-wide commands and target overrides are excluded.")
     if not math.isfinite(timeout) or timeout <= 0:
@@ -159,14 +231,26 @@ def run_adb(serial, token, args, timeout=120, *, capture=False, renew=True):
     with locked(serial) as path:
         record = read_record(path)
         check_owner(record, token)
+        actor = actor if actor is not None else os.environ.get("ADB_COORD_ACTOR")
+        actor = activity_actor(actor) if actor is not None else record["owner"][:80]
+        activity = input_activity(args)
+        if activity:
+            activity.update(id=secrets.token_hex(8), actor=actor)
         if renew:
             record["expires_at"] = time.time() + record["ttl"]
             save_record(path, record)
+        if activity:
+            publish_activity(path, record, {**activity, "phase": "start"})
+        succeeded = False
         try:
             # The explicit socket prevents legacy host/port environment settings from retargeting ADB.
-            return subprocess.run([adb_binary(), "-L", record["server"], "-s", serial, *args],
-                                  timeout=timeout, capture_output=capture, check=False)
+            result = subprocess.run([adb_binary(), "-L", record["server"], "-s", serial, *args],
+                                    timeout=timeout, capture_output=capture, check=False)
+            succeeded = result.returncode == 0
+            return result
         finally:
+            if activity:
+                publish_activity(path, record, {**activity, "phase": "complete", "ok": succeeded})
             if renew:
                 record["expires_at"] = time.time() + record["ttl"]
                 save_record(path, record)
@@ -202,6 +286,7 @@ def main():
             cmd.add_argument("--reclaim-expired", action="store_true")
         if action == "run":
             cmd.add_argument("--timeout", type=float, default=120)
+            cmd.add_argument("--actor", default=os.environ.get("ADB_COORD_ACTOR"), help="Cursor display label; ownership still uses the claim token")
             cmd.add_argument("args", nargs=argparse.REMAINDER)
         if action == "screenshot":
             cmd.add_argument("--out", required=True)
@@ -218,7 +303,7 @@ def main():
                                   getattr(args, "note", None), getattr(args, "ttl", None))
         elif args.action == "run":
             command = args.args[1:] if args.args[:1] == ["--"] else args.args
-            return run_adb(args.serial, args.token, command, args.timeout).returncode
+            return run_adb(args.serial, args.token, command, args.timeout, actor=args.actor).returncode
         else:
             data = screenshot(args.serial, args.token, renew=True)
             with open(args.out, "xb") as out:
