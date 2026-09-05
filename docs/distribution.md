@@ -33,9 +33,7 @@ Both x86_64 and aarch64 builds are provided. Subsequent updates use `dnf upgrade
 
 ## Ubuntu 24.04 LTS (amd64)
 
-The [Android Agent Lab PPA](https://launchpad.net/~hashimkarim/+archive/ubuntu/android-agent-lab)
-is created; the initial signed package upload is being completed. Once the build
-is published, install it with:
+Install from the [Android Agent Lab PPA](https://launchpad.net/~hashimkarim/+archive/ubuntu/android-agent-lab):
 
 ```bash
 sudo add-apt-repository ppa:hashimkarim/android-agent-lab
