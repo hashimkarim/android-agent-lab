@@ -10,3 +10,5 @@ artifacts/
 .lab/
 viewer/public/client.js
 viewer/public/client.js.LICENSE.txt
+.desktop-build/
+desktop/dist*/

@@ -1,0 +1,107 @@
+name: Linux desktop packages
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'desktop/**'
+      - 'scripts/**'
+      - 'viewer/**'
+      - 'skills/**'
+      - 'tests/**'
+      - 'Dockerfile'
+      - 'compose.yaml'
+      - '.github/workflows/desktop.yml'
+  pull_request:
+    paths: ['desktop/**', 'scripts/**', 'viewer/**', 'skills/**', 'tests/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            desktop/package-lock.json
+            viewer/package-lock.json
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools zstd xvfb desktop-file-utils
+      - run: npm ci --prefix desktop
+      - run: npm run prepare-runtime --prefix desktop
+      - run: npm test --prefix desktop
+      - run: python3 -m unittest discover -s tests -v
+      - name: Build native installers
+        run: npm run build --prefix desktop -- --linux --${{ matrix.arch }}
+      - name: Install and launch the DEB as a normal user
+        run: |
+          sudo apt-get install -y ./desktop/dist/*.deb
+          desktop-file-validate /usr/share/applications/android-agent-lab.desktop
+          env -u ELECTRON_RUN_AS_NODE ADB_LAB_USER_DATA="$RUNNER_TEMP/lab-smoke" xvfb-run -a /opt/Android\ Agent\ Lab/android-agent-lab --smoke-test
+      - name: Inspect package metadata and content
+        run: |
+          rpm -qip desktop/dist/*.rpm
+          bsdtar -xOf desktop/dist/*.pkg.tar.zst .PKGINFO
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('.desktop-build/runtime')
+          for path in root.rglob('*'):
+              assert path.name not in ('.env', '.lab'), path
+              assert path.suffix not in ('.private', '.apk'), path
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-${{ matrix.arch }}
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+            desktop/dist/*.rpm
+            desktop/dist/*.pkg.tar.zst
+            desktop/dist/*.tar.gz
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Prepare checksums and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, os, json, shutil
+          from pathlib import Path
+          assert os.environ['RELEASE_TAG'] == 'v' + json.loads(Path('desktop/package.json').read_text())['version']
+          shutil.copy2('scripts/install_appimage.py', 'release/install_appimage.py')
+          root = Path('release')
+          (root / 'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in sorted(root.iterdir()) if p.is_file()))
+          PY
+          gh release create "$RELEASE_TAG" release/* --verify-tag --title "Android Agent Lab $RELEASE_TAG" --notes-file desktop/RELEASE_NOTES.md

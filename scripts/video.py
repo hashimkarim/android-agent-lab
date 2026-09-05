@@ -22,7 +22,7 @@ from adb_preview import input_command
 
 SERVER_VERSION = '3.3.3'
 SERVER_SHA256 = '7e70323ba7f259649dd4acce97ac4fefbae8102b2c6d91e2e7be613fd5354be0'
-SERVER = ROOT / '.lab' / f'scrcpy-server-v{SERVER_VERSION}'
+SERVER = Path(os.environ.get('ADB_VIDEO_SERVER', str(ROOT / '.lab' / f'scrcpy-server-v{SERVER_VERSION}')))
 
 
 def verify_server(path=SERVER):
@@ -77,6 +77,27 @@ def endpoint(value):
     return {'host': match[1].strip('[]'), 'port': int(match[2])}
 
 
+def node_launch(config):
+    """Packaged desktop apps reuse their bundled Node; source installs use PATH."""
+    env = {**os.environ, 'ADB_VIDEO_CONFIG': json.dumps(config)}
+    if os.environ.get('ADB_VIDEO_ELECTRON_NODE') == '1':
+        env['ELECTRON_RUN_AS_NODE'] = '1'
+    return [os.environ.get('ADB_VIDEO_NODE', 'node'), str(ROOT / 'viewer/server.mjs')], env
+
+
+def release_owned(serial, token):
+    # A finishing input may still hold the lock. Never release a replacement owner.
+    for _ in range(20):
+        try:
+            coord.change_claim(serial, token, 'release')
+            return
+        except coord.CoordinationError:
+            record = coord.read_record(coord.record_path(serial))
+            if not record or not secrets.compare_digest(record['token'], token):
+                return
+            time.sleep(.25)
+
+
 def start(args):
     verify_server()
     if not (ROOT / 'viewer/public/client.js').is_file():
@@ -97,8 +118,8 @@ def start(args):
                           endpoint=endpoint(coord.server_id()), key=secrets.token_urlsafe(32), port=args.port,
                           control=args.control, maxSize=args.max_size, maxFps=args.max_fps,
                           width=width, height=height, serverFile=str(SERVER), python=sys.executable, supervisor=os.getpid())
-            env = {**os.environ, 'ADB_VIDEO_CONFIG': json.dumps(config)}
-            child = subprocess.Popen(['node', str(ROOT / 'viewer/server.mjs')], env=env, stdout=subprocess.PIPE, text=True)
+            command, env = node_launch(config)
+            child = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, text=True)
             # Hold the operation lock through server upload/start, then let ADB commands run.
             with selectors.DefaultSelector() as selector:
                 selector.register(child.stdout, selectors.EVENT_READ)
@@ -113,6 +134,8 @@ def start(args):
         deadline = time.monotonic() + args.duration
         while child.poll() is None and time.monotonic() < deadline:
             time.sleep(.25)
+            if getattr(args, 'parent_pid', None) and os.getppid() != args.parent_pid:
+                break
             # Atomic record replacement makes this passive read safe. It must not renew.
             coord.check_owner(coord.read_record(coord.record_path(args.serial)), args.token)
         if child.poll() not in (None, 0):
@@ -125,6 +148,8 @@ def start(args):
             except subprocess.TimeoutExpired:
                 child.kill()
                 child.wait()
+        if getattr(args, 'release_on_exit', False):
+            release_owned(args.serial, args.token)
 
 
 def main():
@@ -140,6 +165,8 @@ def main():
     p.add_argument('--duration', type=int, default=1800)
     p.add_argument('--max-size', type=int, default=1280)
     p.add_argument('--max-fps', type=int, default=30)
+    p.add_argument('--parent-pid', type=int, help=argparse.SUPPRESS)
+    p.add_argument('--release-on-exit', action='store_true', help='Release this token when the desktop-owned session stops')
     args = parser.parse_args()
     def interrupted(*_):
         raise KeyboardInterrupt

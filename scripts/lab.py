@@ -13,8 +13,9 @@ import sys
 import time
 from urllib.parse import urlencode
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "skills/adb-coordination/scripts"))
+SOURCE_ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(os.environ.get("ADB_LAB_HOME", str(SOURCE_ROOT))).resolve()
+sys.path.insert(0, str(SOURCE_ROOT / "skills/adb-coordination/scripts"))
 import adb_coord as coord
 
 

@@ -12,7 +12,16 @@ A small derived Dockerfile adds Google's stable Android 16 system image and
 one version mapping and a Pixel data-persistence fix to the upstream launcher. Emulator execution, streaming,
 and input handling are supplied by existing upstream components.
 
-## Start
+## Linux desktop app
+
+[Download Android Agent Lab](https://github.com/Hashim-K/android-agent-lab/releases)
+as an **AppImage, DEB, RPM, Arch package, or portable tar archive**. The desktop
+launcher discovers devices, starts the Android 16 emulator, and opens the same
+scrcpy viewer used by browser previews. Share a session's private browser URL or
+agent instructions to work together with named cursors on one Android screen.
+See [installation, requirements, and building](docs/desktop.md).
+
+## Start from source
 
 Requires a **Linux x86_64 host with working `/dev/kvm`**, Docker Engine with Compose,
 Python 3.10+, and Android SDK platform-tools (`adb`). Allow about 25 GB for the

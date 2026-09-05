@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>Android Agent Lab</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="renderer.js" defer></script>
+</head>
+<body>
+  <header><div class="brand"><img src="icon.png" alt="" width="48" height="48"><div><h1>Android Agent Lab</h1><p>One device. Your app, your agents, your browser.</p></div></div><button id="docs" class="quiet">Help ↗</button></header>
+  <main>
+    <div class="lead"><div><span class="eyebrow">WORKSPACE</span><h2>Your Android devices</h2><p>Open a phone or emulator, then invite an agent into the same screen.</p></div><button id="refresh">↻ Refresh</button></div>
+    <div id="notice" role="status" aria-live="polite" hidden></div>
+    <div id="requirements">Checking Python and ADB…</div>
+    <section aria-label="Devices"><div id="devices" class="devices"><p class="empty">Looking for connected devices…</p></div></section>
+    <section id="sessions-section" hidden><div class="section-heading"><h2>Shared sessions</h2><span class="muted">Desktop + browser + agents</span></div><div id="sessions"></div></section>
+    <div class="setup-grid">
+      <section class="panel"><span class="eyebrow">START FRESH</span><h2>Android 16 emulator</h2><p>A persistent Pixel 9 with API 36.1. Runs locally in Docker with KVM acceleration.</p><button id="emulator">Start emulator</button><p class="fine" id="emulator-help">Requires Docker Compose, Linux x86_64, and /dev/kvm. First setup downloads several GB.</p></section>
+      <section class="panel"><span class="eyebrow">KEEP WORKING TOGETHER</span><h2>Connect your agents</h2><p>Add live device coordination to Codex, Claude Code, and T3’s provider. Open a device, then copy its agent instructions.</p><button id="skill" class="quiet">Install coordination skill</button><p class="fine">Existing skill installations are preserved.</p></section>
+    </div>
+    <section class="panel join"><div><h2>Already have a viewer?</h2><p>Paste its private localhost URL to open the same screen in a desktop window.</p></div><form id="join-form"><label class="sr-only" for="join-url">Private viewer URL</label><input id="join-url" type="password" placeholder="http://127.0.0.1:8766/#key=…" autocomplete="off" required><button>Open viewer</button></form></section>
+    <details><summary>Connection options &amp; startup log</summary><div class="options"><label>Browser port <input id="port" type="number" min="0" max="65535" value="0"></label><p class="fine">0 picks an available port. Copy the session’s URL into your preview pane.</p></div><pre id="log">No emulator startup in progress.</pre></details>
+  </main>
+  <footer><span id="version">Android Agent Lab</span><span>Local video · Named agent cursors · Shared ADB claims</span></footer>
+  <dialog id="claim-dialog"><form id="claim-form"><h2>Join the current owner</h2><p id="claim-description"></p><label>Claim token<input id="claim-token" type="password" autocomplete="off" required></label><p class="fine">Get the token from the owning thread. The desktop will leave this claim intact when it closes.</p><div class="dialog-actions"><button id="cancel-claim" type="button" class="quiet">Cancel</button><button>Open shared device</button></div></form></dialog>
+</body>
+</html>

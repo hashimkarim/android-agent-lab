@@ -15,6 +15,8 @@ For live USB or wireless phones/tablets and the portable browser preview, read
 [devices.md](references/devices.md). They use the same ownership protocol.
 For direct scrcpy video and coordinated browser input on either kind of device,
 including visible agent cursors, read [video.md](references/video.md).
+For sessions shared from the Linux desktop app, read
+[desktop.md](references/desktop.md) and use its copied session token.
 For app creation, SDK setup, current Android documentation, and Studio features,
 prefer [Google's Android CLI and skills](https://github.com/android/skills).
 This skill adds ownership between threads; other tools must respect active
