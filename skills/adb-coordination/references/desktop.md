@@ -11,6 +11,11 @@ again or release the shared claim when your own task finishes. Leave it for the
 human. Each command still takes the per-device lock, and both sides should take
 turns when a test needs a stable screen. Status alone never reveals the token.
 
+The viewer has **Agents only** and **Agents and user** cursor modes. The human
+pointer is a small circle that tracks hovering continuously. Touch gestures
+stream through scrcpy while holding the shared device lock until release or
+cancel. Developer toolbars and output panels stay outside the phone screen.
+
 The desktop app renews its one-hour claim on device input, not passive viewing.
 Stopping or quitting releases app-created claims and stops their browser ports.
 Joining with another thread's token leaves that thread's claim intact on exit.

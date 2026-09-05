@@ -54,13 +54,17 @@ function lockWindow(window, allowed) {
   window.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
   window.webContents.on('will-navigate', (event, target) => { if (!allowed(target)) event.preventDefault(); });
   window.webContents.on('will-redirect', (event, target) => { if (!allowed(target)) event.preventDefault(); });
-  window.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
-  window.webContents.session.setPermissionCheckHandler(() => false);
+  const canFullscreen = (contents, permission) => {
+    if (permission !== 'fullscreen' || !contents || !viewers.has(BrowserWindow.fromWebContents(contents))) return false;
+    try { viewerUrl(contents.getURL()); return true; } catch { return false; }
+  };
+  window.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => callback(details.isMainFrame && canFullscreen(contents, permission)));
+  window.webContents.session.setPermissionCheckHandler(canFullscreen);
 }
 
 async function openViewer(value, title = 'Shared device') {
   const url = viewerUrl(value);
-  const window = new BrowserWindow({width: 720, height: 1000, minWidth: 430, minHeight: 520,
+  const window = new BrowserWindow({width: 980, height: 1000, minWidth: 430, minHeight: 520,
     title: `${title} — Android Agent Lab`, backgroundColor: '#0b1020',
     icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true,
     webPreferences: {nodeIntegration: false, contextIsolation: true, sandbox: true}});

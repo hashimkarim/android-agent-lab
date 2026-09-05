@@ -71,13 +71,17 @@ accepts a physical phone's serial and needs no Docker for that case.
 
 **Agent cursors** show where coordinated agent taps and drags happen, with
 separate names and colors in every browser view. Typing and navigation appear
-as activity labels. Use **Show cursors** to hide the overlay; see
+as activity labels. Choose **Agents only** or **Agents and user**; the user
+pointer is a small circle that follows hovering continuously. See
 [cursor attribution](docs/streaming.md#agent-cursors) for shared-session labels.
 
 Omit `--control` for read-only video. Every input checks the shared claim;
 handoff or expiry stops the old stream. Video alone does not renew ownership.
 Ctrl+C stops the viewer, leaving the device and claim intact. Current browser
-input supports basic single-pointer gestures and ASCII text through ADB.
+input sends continuous single-pointer gestures through scrcpy, including holds,
+drags, scrolling, and explicit Unicode clipboard paste. Developer toolbars sit
+outside the phone screen: navigation, rotation, volume, screenshots, recording,
+APK installation, Logcat, and UI hierarchy inspection.
 See [setup, limits, and performance tradeoffs](docs/streaming.md) for details.
 
 ## Let an agent use it
@@ -222,6 +226,7 @@ python3 scripts/lab.py init
 docker compose config --quiet
 npm ci --prefix viewer
 npm run build --prefix viewer
+npm test --prefix viewer
 node --check viewer/server.mjs
 ```
 

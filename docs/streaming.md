@@ -39,21 +39,42 @@ updating and testing the matching client protocol.
 
 ## Interaction and handoff
 
-Click for a tap, drag for a swipe, and use Back/Home/Recents above the screen.
-Click the screen before typing, or use the text box to send a string. Current
-input supports printable ASCII, navigation keys, and single-pointer gestures.
-Swipes are sent on release with a fixed 300 ms duration. Multitouch, long press,
-audio, clipboard sync, arbitrary Unicode/IME input, and the literal sequence
-`%s` in text are not implemented. Restart the viewer after changing Android's
-display resolution. Rotation is mapped from the streamed frame orientation.
+Click, hold, drag, scroll, and type directly on the screen. Touch-down, movement,
+and release travel over a persistent scrcpy control channel; the app responds
+while you are dragging. Click the screen for keyboard input, or use **Paste to
+device** for Unicode text via the Android clipboard. Clipboard contents are sent
+only when you explicitly paste. Automatic clipboard synchronization, audio,
+multitouch, and full IME composition are not implemented.
+
+Toolbars sit outside the phone screen in both the desktop app and browser:
+
+- Power, volume, rotation, Back, Home, Recents, notifications, and quick settings.
+- Full-resolution PNG screenshots and WebM screen recording (video only,
+  up to five minutes / approximately 128 MB; cursor overlays are excluded).
+- APK installation, the latest 500 Logcat lines, UI hierarchy inspection, and
+  shortcuts to Android settings, developer options, and app management.
+- Fit, zoom, fullscreen, and video refresh. Tool output opens below the screen
+  with refresh and save controls. APK uploads are limited to 200 MB.
+
+The Rotate button locks Android to portrait or landscape; **Auto-rotate**
+restores sensor rotation. Coordinates follow the streamed frame dimensions. A rotation during an active
+gesture cancels that gesture. Restart after changing the device's display
+resolution outside the viewer.
 
 ### Agent cursors
 
-**Show cursors** displays named, colored pointers for coordinated agent taps
-and swipe paths in every connected browser view. Markers fade after eight
-seconds; failed input turns red. Typing and navigation appear in the activity
-line without exposing typed characters. These mark input attempts, not mouse
-hover or proof that the app handled an action.
+The **Cursors** selector has two modes, saved locally in each viewer:
+
+- **Agents only** shows named, colored agent pointers.
+- **Agents and user** also shows the human pointer as a small circle, with a
+  larger pressed state. It follows hover and drag continuously, before any
+  click, and disappears when the pointer leaves the screen.
+
+Browser agents also publish continuous hover positions. Live pointers stay
+visible while present and clear on disconnect. Coordinated CLI taps and swipe
+paths remain visible for eight seconds; failed actions turn red. Typing and
+navigation appear in the activity line without exposing typed characters.
+Cursor feedback does not prove that the app handled an action.
 
 Agent commands through `lab.py adb` or the updated `adb_coord.py run` emit this
 feedback automatically, using the claim owner's label. To identify an agent
@@ -81,11 +102,14 @@ commands are recognized; a cursor is not guessed for other shell commands.
 ### Shared input and lifecycle
 
 The video connection observes the active claim without extending its lifetime.
-Every browser input goes through the Python coordinator's per-device lock and
-renews the claim, just like agent ADB commands. This keeps ownership checks
-consistent; input currently uses ADB injection and can feel slower than native
-scrcpy's continuous control channel. Humans and agents can both operate the
-same app, but should take turns during tests that need stable screen state.
+The persistent Python broker takes the same per-device lock used by agent ADB
+commands. A touch gesture holds it from down through up/cancel; movement goes
+directly to scrcpy without spawning ADB/Python processes or saving claims for
+each move. Navigation, text, and developer tools also take the shared lock.
+Inputs renew ownership, while hover only updates visual presence. Disconnect,
+window blur, rotation, and idle/hard timeouts cancel held touches and release
+the operation lock. Humans and agents operate the same Android screen and
+should take turns during tests that need stable screen state.
 
 Release, expiry, or token rotation closes the old stream and listener; browser
 input rechecks ownership inside the operation lock. To switch owners:
@@ -109,15 +133,15 @@ device service; users sharing the host account can access its processes/state.
 
 ## Performance and alternatives
 
-The defaults are H.264 at up to 1280 pixels on the longest edge, 30 FPS, and
+The defaults are H.264 at up to 1280 pixels on the longest edge, 60 FPS, and
 4 Mbit/s. Try `--max-size 960` if decoding or encoding is expensive, or
-`--max-fps 60` for a higher cap. FPS is a maximum, not a promised frame rate;
+`--max-fps 30` to reduce work. FPS is a maximum, not a promised frame rate;
 static screens may produce no new frames. Reconnect reloads the viewer and
 replays a bounded cached keyframe group so a static app can appear immediately.
 
 | Viewer | Useful for | Tradeoff |
 | --- | --- | --- |
-| Browser scrcpy, included | Direct Android video in the preview pane with coordinated input | WebCodecs required; basic ADB input rather than full native gestures |
+| Browser scrcpy, included | Direct Android video in the preview pane with coordinated input | WebCodecs required; single-pointer touch and explicit clipboard paste |
 | Native scrcpy | Desktop mirroring and mature keyboard/gesture handling | Separate window; does not enforce this lab's claims |
 | noVNC, included with Docker | Emulator toolbar, rotation, and extended emulator controls | Captures the container desktop through an additional display path |
 | Portable screenshot viewer, included in the skill | Inspecting a phone without the Node bridge | About one update per second |
@@ -138,6 +162,31 @@ decoding. The Docker emulator uses software graphics. Direct capture removes
 the VNC desktop path but does not accelerate Android itself; this release has
 no controlled end-to-end latency benchmark.
 
+The input architecture follows upstream scrcpy's continuous control channel.
+[Sefirah's mirroring service](https://github.com/shrimqy/Sefirah/blob/master/src/Sefirah/Services/ScreenMirrorService.cs)
+also launches upstream scrcpy. Its application code was not copied; this
+project keeps Tango for the shared browser/desktop transport.
+
+### Control API
+
+Agents can keep using coordinated ADB commands or drive the browser. For a
+persistent client, connect to `/control` with WebSocket subprotocol
+`adb-control.KEY`, using the private viewer key. Include a unique `actor` and
+optional request `id` (for acknowledgements). Pointer/hover coordinates use the
+**encoded frame width and height**, not Android's physical pixel dimensions:
+
+```json
+{"kind":"hover","actor":"codex:thread-id","x":200,"y":400,"width":568,"height":1280}
+{"kind":"pointer","phase":"down","actor":"codex:thread-id","id":1,"x":200,"y":400,"width":568,"height":1280}
+{"kind":"pointer","phase":"move","actor":"codex:thread-id","x":200,"y":300,"width":568,"height":1280}
+{"kind":"pointer","phase":"up","actor":"codex:thread-id","id":2,"x":200,"y":300,"width":568,"height":1280}
+```
+
+Hover with `phase:"leave"` clears presence. Use the same socket/actor for the
+entire gesture. Stale dimensions and competing gestures are rejected. The
+existing authenticated `POST /input` tap/swipe/key/text interface remains
+available; tap/swipe coordinates there remain physical Android pixels.
+
 ## Verification record
 
 On 2026-09-05, the browser viewer decoded live 568 × 1280 H.264 video from the
@@ -156,6 +205,15 @@ correct screen coordinates. Drag feedback, click-through behavior, resize,
 visibility toggling, and expiry passed without browser errors. Automated tests
 also cover attribution, rejected claims, failed input, handoff isolation,
 bounded feedback storage, and omission of typed text.
+
+Additional live validation for continuous input used an Android test view:
+MOVE events changed its rendered screen while the browser mouse remained down,
+and a competing coordinated ADB command was rejected until release. Two viewers
+verified hover-only human circles, named agent hover, mode filtering, and cursor
+cleanup. APK upload, Logcat, hierarchy, PNG downloads, WebM recording, fullscreen,
+and non-overlapping layouts at 430/680/980 pixels passed. Unit tests exercise
+gesture serialization, disconnect cancellation, read-only/stale-claim rejection,
+clipboard attribution, and broker EOF cleanup.
 
 The project reuses upstream capture and decoding instead of maintaining a
 scrcpy fork. [NetrisTV/ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) offers

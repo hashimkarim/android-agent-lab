@@ -44,7 +44,7 @@ chmod +x Android-Agent-Lab-*.AppImage
 To install it for your user, download `install_appimage.py` from the same release:
 
 ```bash
-python3 install_appimage.py ./Android-Agent-Lab-0.1.0-x86_64.AppImage
+python3 install_appimage.py ./Android-Agent-Lab-0.2.0-x86_64.AppImage
 ```
 
 This creates a launcher and icon in your application menu, stores the image in
@@ -71,8 +71,15 @@ app's sandbox profile. Do not disable the browser sandbox as a routine workaroun
 Use a unique actor label per agent for colored cursors. Commands share the same
 claim and serialize through the coordinator. Human and agent inputs still change
 one Android UI; take turns during assertions and gestures. The video path is
-scrcpy H.264 with WebCodecs, without a VNC desktop in between. Input currently
-supports single-pointer gestures, navigation keys, and printable ASCII text.
+scrcpy H.264 with WebCodecs, without a VNC desktop in between. Input sends touch-down, movement, and release over the persistent scrcpy
+control channel, with the shared lock held for the whole gesture. Holds, drags,
+scrolling, navigation keys, and explicit Unicode clipboard paste are supported.
+
+Choose **Agents only** or **Agents and user**. The human pointer is a small
+circle that follows hover continuously; agent pointers have names and colors.
+Toolbars beside the screen provide navigation, rotation, volume, screenshots,
+recording, APK installation, Logcat, UI hierarchy, and settings shortcuts. Output
+panels open below the device. See the [viewer guide](streaming.md) for limits.
 
 **Already have a viewer?** Paste its private localhost URL at the bottom of the
 launcher. This attaches another window to the existing stream. If a device is

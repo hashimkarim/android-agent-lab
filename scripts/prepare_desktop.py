@@ -17,12 +17,12 @@ def main():
         shutil.rmtree(TARGET)
     for directory in ('scripts', 'viewer/public', 'vendor'):
         (TARGET / directory).mkdir(parents=True, exist_ok=True)
-    for name in ('lab.py', 'video.py', 'desktop_rpc.py'):
+    for name in ('lab.py', 'video.py', 'desktop_rpc.py', 'control_broker.py', 'device_tools.py'):
         shutil.copy2(ROOT / 'scripts' / name, TARGET / 'scripts' / name)
     shutil.copytree(ROOT / 'skills', TARGET / 'skills', ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
     for name in ('compose.yaml', 'Dockerfile', '.dockerignore', 'LICENSE'):
         shutil.copy2(ROOT / name, TARGET / name)
-    for name in ('server.mjs', 'package.json', 'package-lock.json'):
+    for name in ('server.mjs', 'control.mjs', 'broker.mjs', 'options.mjs', 'package.json', 'package-lock.json'):
         shutil.copy2(ROOT / 'viewer' / name, TARGET / 'viewer' / name)
     shutil.copytree(ROOT / 'viewer/public', TARGET / 'viewer/public', dirs_exist_ok=True)
     shutil.copy2(video.SERVER, TARGET / 'vendor' / video.SERVER.name)

@@ -4,7 +4,8 @@
   "type": "module",
   "engines": {"node": ">=22"},
   "scripts": {
-    "build": "esbuild client.js --bundle --format=esm --outfile=public/client.js"
+    "build": "esbuild client.js --bundle --format=esm --outfile=public/client.js",
+    "test": "node --test *.test.mjs"
   },
   "dependencies": {
     "@yume-chan/adb": "2.6.4",

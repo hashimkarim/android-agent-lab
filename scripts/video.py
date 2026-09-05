@@ -164,7 +164,7 @@ def main():
     p.add_argument('--port', type=int, default=0)
     p.add_argument('--duration', type=int, default=1800)
     p.add_argument('--max-size', type=int, default=1280)
-    p.add_argument('--max-fps', type=int, default=30)
+    p.add_argument('--max-fps', type=int, default=60)
     p.add_argument('--parent-pid', type=int, help=argparse.SUPPRESS)
     p.add_argument('--release-on-exit', action='store_true', help='Release this token when the desktop-owned session stops')
     args = parser.parse_args()

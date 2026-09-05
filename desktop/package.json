@@ -2,7 +2,7 @@
   "name": "android-agent-lab",
   "productName": "Android Agent Lab",
   "desktopName": "android-agent-lab",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shared Android devices, scrcpy video, and visible agent cursors on your desktop.",
   "main": "app/main.cjs",
   "author": {"name":"Hashim", "url":"https://github.com/Hashim-K"},

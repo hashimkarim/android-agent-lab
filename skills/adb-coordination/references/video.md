@@ -30,10 +30,12 @@ preview browser runs on another host, forward the same port over SSH.
 
 The Android capture uses the official scrcpy server; the browser decodes the
 video with WebCodecs. There is no need to open a desktop scrcpy window. The
-browser controls support taps, swipes sent on release, navigation keys, and
-printable ASCII text. Advanced gestures, Unicode/IME, audio, and clipboard sync
-are not implemented. Agent actions still use the normal coordinated ADB
-wrapper. Use screenshots or Android UI hierarchy for native widget semantics;
+browser controls send continuous touch-down/move/up through scrcpy, supporting
+holds, drags, scrolling, navigation, and explicit Unicode clipboard paste.
+Multitouch, full IME composition, audio, and automatic clipboard sync are not
+implemented. Side toolbars provide APK installation, Logcat, UI hierarchy,
+screenshots, recording, rotation, volume, and settings shortcuts. Agent actions
+can use the normal coordinated ADB wrapper or browser controls. Use screenshots or Android UI hierarchy for native widget semantics;
 the browser DOM only describes the viewer controls and canvas.
 
 ## Visible agent cursors
@@ -52,6 +54,11 @@ agents should append a URL-encoded actor to the existing private fragment,
 for example `#key=...&actor=codex%3Athread-id`. Ordinary browser input defaults
 to a human actor. Do not label agent automation as human input.
 
+The cursor selector has **Agents only** and **Agents and user** modes. Human
+pointers are small circles that follow hover continuously, before any click.
+Browser agents also publish live hover positions; live pointers clear on leave
+or disconnect. CLI feedback retains its eight-second lifetime.
+
 The overlay is local to the browser and does not intercept clicks or add Android
 commands. It is absent from native scrcpy and Android screenshots. Unwrapped
 ADB and complex shell scripts do not emit these markers. Use native screenshots
@@ -59,7 +66,9 @@ or UI hierarchy to confirm the app's actual response.
 
 ## Ownership and cleanup
 
-Every browser input takes the shared operation lock and rechecks the token.
+Every browser gesture holds the shared operation lock from down to up/cancel
+and rechecks the token. Motion is sent directly to scrcpy without per-move
+ADB processes or claim writes. Hover never sends Android input or renews a claim.
 Passive video does not renew the claim. Humans and agents should take turns
 when screen state matters. Handing off rotates the token and stops the old
 viewer automatically; give the new token to the recipient and start a fresh
@@ -72,7 +81,7 @@ shutting down the emulator or phone. Stopping the viewer leaves the claim
 intact; release it when finished. A separately launched native scrcpy window
 does not follow this lifecycle and must be closed explicitly before handoff.
 
-Default video is H.264, longest edge 1280, up to 30 FPS; `--max-size 960` can
+Default video is H.264, longest edge 1280, up to 60 FPS; `--max-size 960` can
 reduce encoding/decoding work. Higher `--max-fps` is a cap rather than a
 guarantee. The full protocol, setup, limitations, and validation record are in
 the lab's [streaming guide](https://github.com/Hashim-K/android-agent-lab/blob/main/docs/streaming.md).
