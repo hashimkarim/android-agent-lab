@@ -2,6 +2,8 @@
 
 Use [Android Agent Lab](https://github.com/Hashim-K/android-agent-lab), a small
 Compose setup around budtmo/docker-android with its upstream noVNC viewer.
+For direct Android video with coordinated browser controls, use the lab's
+scrcpy/Tango viewer described in [video.md](video.md).
 The derived image runs Android 16 / API 36.1 using a Pixel 9 profile. It adds
 a stable Android 16 system image to the upstream browser/emulator infrastructure.
 Locate the checkout supplied by the user. If this skill is loaded from that

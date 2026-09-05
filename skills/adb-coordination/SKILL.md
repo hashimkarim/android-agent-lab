@@ -1,6 +1,6 @@
 ---
 name: adb-coordination
-description: Coordinate ADB devices and emulators across Codex, Claude Code, and T3 Code threads with shared device claims, serialized commands, screenshots, and handoffs. Use for Android deployment, device UI testing, ADB contention, and Docker emulator browser previews.
+description: Coordinate live Android phones, tablets, and emulators across Codex, Claude Code, and T3 Code threads with shared ADB claims, serialized commands, previews, and handoffs. Use for USB or wireless device testing, Android deployment, ADB contention, and Docker emulator previews.
 ---
 
 # ADB coordination
@@ -11,6 +11,10 @@ skill's actual directory, including when loaded through a symlink.
 
 For an interactive Docker emulator in a browser preview, read
 [docker.md](references/docker.md). For existing devices, use the workflow below.
+For live USB or wireless phones/tablets and the portable browser preview, read
+[devices.md](references/devices.md). They use the same ownership protocol.
+For direct scrcpy video and coordinated browser input on either kind of device,
+read [video.md](references/video.md).
 For app creation, SDK setup, current Android documentation, and Studio features,
 prefer [Google's Android CLI and skills](https://github.com/android/skills).
 This skill adds ownership between threads; other tools must respect active
@@ -77,7 +81,9 @@ client; inspect before recovery.
 
 Stop only task-owned previews/emulators when finished, unless the user wants
 them available. A Docker lab intended for interactive use can remain running;
-release the agent claim and report its URL and stop command.
+report its URL and stop command. For a coordinated video session left for the
+user, hand off to a human claim and start a new viewer with its token; releasing
+the claim would stop that viewer. noVNC stays available without a claim.
 
 ## Client boundaries
 

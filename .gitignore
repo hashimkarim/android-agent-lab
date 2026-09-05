@@ -8,3 +8,5 @@ artifacts/
 *.apk
 *.log
 .lab/
+viewer/public/client.js
+viewer/public/client.js.LICENSE.txt

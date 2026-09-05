@@ -3,8 +3,10 @@
 An **Android 16 / API 36.1** emulator you can use in a browser preview while Codex, Claude Code,
 or a T3 Code thread works through ADB. Reuses
 [budtmo/docker-android](https://github.com/budtmo/docker-android) for the emulator,
-desktop input, and noVNC. This repository supplies Compose configuration, a small
-Python launcher, and a portable skill for coordinating agent access.
+desktop input, and noVNC, plus official [scrcpy](https://github.com/Genymobile/scrcpy)
+and [Tango](https://tangoadb.dev/scrcpy/) for direct Android video in the browser.
+This repository supplies Compose configuration, the local browser bridge, and
+a portable skill for coordinating agent access to emulators and live phones.
 
 A small derived Dockerfile adds Google's stable Android 16 system image and
 one version mapping and a Pixel data-persistence fix to the upstream launcher. Emulator execution, streaming,
@@ -42,6 +44,28 @@ with its existing Gradle project and install the resulting APK through ADB.
 This shows a running Android app; Android Studio's Compose/layout design-time
 previews and Layout Inspector are separate IDE features.
 
+## Direct video in the preview pane
+
+For direct Android capture with browser controls, install the optional viewer
+dependencies (Node.js 22+ and npm required), then claim the running device:
+
+```bash
+python3 scripts/video.py setup
+python3 scripts/lab.py claim --owner 'human:your-name' --note 'Interactive browser session'
+python3 scripts/video.py start --serial 127.0.0.1:15555 --token '<claim-token>' --control --port 8766
+```
+
+Open its printed private URL in a Chromium browser or the preview pane. Click,
+drag, type, and use Back/Home/Recents. The browser decodes H.264 from the official
+scrcpy Android server; a native desktop window is optional. The viewer also
+accepts a physical phone's serial and needs no Docker for that case.
+
+Omit `--control` for read-only video. Every input checks the shared claim;
+handoff or expiry stops the old stream. Video alone does not renew ownership.
+Ctrl+C stops the viewer, leaving the device and claim intact. Current browser
+input supports basic single-pointer gestures and ASCII text through ADB.
+See [setup, limits, and performance tradeoffs](docs/streaming.md) for details.
+
 ## Let an agent use it
 
 ```bash
@@ -62,7 +86,7 @@ python3 scripts/lab.py release --token '<claim-token>'
 
 Use a new screenshot path; the command refuses to overwrite an existing file.
 Agents can inspect that screenshot and use Android UI hierarchy information
-for native widgets. A browser DOM snapshot only sees the noVNC controls/canvas.
+for native widgets. A browser DOM snapshot only sees the viewer controls/canvas.
 
 Every cooperating thread uses the same per-device claim registry on the ADB
 host. Claims default to 30 minutes, renew during commands, reject competing
@@ -76,9 +100,11 @@ Pass the returned new token to that thread through your normal handoff mechanism
 No chat history synchronization or messaging service is included.
 
 **Humans and agents share one Android screen.** Both can interact, but take turns
-when a test depends on stable UI state. Release the agent claim for a human
-session; optionally claim with `--owner 'human:your-name'` to make cooperating
-agents wait. noVNC, raw ADB, and Android Studio do not enforce these claims.
+when a test depends on stable UI state. Hand off to `--owner 'human:your-name'`
+for a human session, which makes cooperating agents wait. Start a fresh video
+viewer with the new token; handoff revokes the old viewer. For noVNC, releasing
+the agent claim also allows a human turn without restarting a viewer. noVNC,
+raw ADB, native scrcpy, and Android Studio do not enforce these claims.
 This is cooperative coordination, not a security boundary or a distributed lock.
 
 ## Install the skill
@@ -99,8 +125,12 @@ path to `skills/adb-coordination/SKILL.md` and give it this checkout's path.
 T3 Code uses its selected provider's skill support; install on the host where
 that provider executes. See [client and remote setup](skills/adb-coordination/references/clients.md).
 
-The skill also works with existing physical devices and native emulators.
-Its coordinator uses the same state format as the standalone personal skill.
+The skill includes [live physical-device coordination](skills/adb-coordination/references/devices.md)
+for USB and wireless phones/tablets, [live video instructions](skills/adb-coordination/references/video.md),
+and a self-contained browser screenshot fallback with optional claim-checked
+input. Its coordinator uses the same state
+format as the standalone personal skill. Use `adb_coord.py --serial` commands
+for those devices; `lab.py` specifically targets the Docker emulator.
 
 ## Operation
 
@@ -168,21 +198,26 @@ IDE's inspectors and design-time features.
 
 ## Development and licenses
 
-The helpers use Python's standard library. Tests run against a fake ADB and
-temporary claims; they do not touch connected devices:
+The Python helpers use the standard library; the optional video bridge uses
+locked npm dependencies. Automated tests use fake ADB and temporary claims;
+they do not touch connected devices:
 
 ```bash
 python3 -m unittest discover -s tests -v
 python3 scripts/lab.py init
 docker compose config --quiet
+npm ci --prefix viewer
+npm run build --prefix viewer
+node --check viewer/server.mjs
 ```
 
-These tests cover coordination and launcher behavior. Emulator boot and noVNC
-interaction require separate testing on a KVM host; see the troubleshooting page
-for the verification record and limitations.
+These tests cover coordination, launcher behavior, preview access, and video
+input permissions. Emulator boot and browser video/input require separate live
+testing; see [troubleshooting](docs/troubleshooting.md) and the
+[video verification record](docs/streaming.md#verification-record).
 
 Original code in this repository is [MIT licensed](LICENSE). The upstream
-container, Android SDK/system images, noVNC, and other bundled dependencies retain
+container, Android SDK/system images, noVNC, scrcpy, Tango, and other dependencies retain
 their own licenses. In particular, see
 [budtmo's license](https://github.com/budtmo/docker-android/blob/master/LICENSE.md).
 This project is independent of those projects and of the agent clients.

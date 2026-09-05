@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Android · Device preview</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#11151d;color:#e9edf5}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center}
+header{box-sizing:border-box;width:100%;padding:18px 22px;background:#191f2b;border-bottom:1px solid #30394a}
+h1{font-size:18px;margin:0 0 6px;letter-spacing:.2px}p{font-size:13px;color:#afbed4;margin:5px 0}
+#status{min-height:20px;color:#92d9c0;overflow-wrap:anywhere}
+main{display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px;flex:1}
+#screen{display:block;max-width:min(100%,460px);max-height:70vh;width:auto;height:auto;border-radius:12px;box-shadow:0 12px 45px #0007;touch-action:none;user-select:none}
+#screen[hidden]{display:none}
+nav{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}button{border:1px solid #46536a;background:#222d40;color:#e9edf5;border-radius:8px;padding:9px 14px;cursor:pointer}
+button:hover{background:#31435e}button:disabled{opacity:.4;cursor:default}footer{font-size:12px;color:#8797b0;margin:0 16px 16px;text-align:center}
+</style>
+<header><h1>Android device preview</h1><p id="device">Connecting…</p><p id="status" role="status">Waiting for the device</p></header>
+<main><img id="screen" alt="Live Android device screen" hidden draggable="false">
+<nav aria-label="Device navigation"><button data-key="BACK" disabled>Back</button><button data-key="HOME" disabled>Home</button><button data-key="APP_SWITCH" disabled>Recents</button><button id="pause">Pause</button></nav></main>
+<footer>Screenshot preview · about one refresh per second · app animations may appear choppy</footer>
+<script>
+const fragment = new URLSearchParams(location.hash.slice(1));
+const key = fragment.get('key') || sessionStorage.getItem('adb-preview-key') || '';
+if(key) sessionStorage.setItem('adb-preview-key',key);
+// Keep the fragment: some preview hosts recreate the browser context between actions.
+// Fragments are not sent to the HTTP server or included in the Referer header.
+const screen = document.querySelector('#screen'), status = document.querySelector('#status');
+let paused=false, control=false, blobUrl=null, start=null, sending=false, refreshing=false;
+async function api(path, data){
+  const response=await fetch(path,{headers:{'X-ADB-Preview-Key':key,...(data?{'Content-Type':'application/json'}:{})},method:data?'POST':'GET',body:data?JSON.stringify(data):undefined});
+  if(!response.ok){const e=await response.json();throw new Error(e.error||'Preview unavailable');}
+  return response;
+}
+async function refresh(){
+  try{
+    if(!paused && !document.hidden && !sending){
+      refreshing=true;
+      const info=await(await api('/status')).json();control=info.control;
+      document.querySelector('#device').textContent=`${info.serial} · ${info.owner} · ${control?'Touch enabled':'View only'}`;
+      document.querySelectorAll('[data-key]').forEach(b=>b.disabled=!control);
+      const blob=await(await api('/frame')).blob(), next=URL.createObjectURL(blob), previous=blobUrl;
+      await new Promise((resolve,reject)=>{screen.onload=resolve;screen.onerror=()=>reject(new Error('Could not decode the device image'));screen.src=next;});
+      blobUrl=next;if(previous)URL.revokeObjectURL(previous);screen.hidden=false;
+      status.textContent=`Updated ${new Date().toLocaleTimeString()}`;
+    }
+  }catch(e){status.textContent=e.message;}finally{refreshing=false;}
+  setTimeout(refresh,1000);
+}
+async function send(data){
+  if(!control || sending)return;sending=true;
+  try{while(refreshing)await new Promise(r=>setTimeout(r,50));await api('/input',data);status.textContent='Input sent';}catch(e){status.textContent=e.message;}finally{sending=false;}
+}
+document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>send({kind:'key',key:b.dataset.key}));
+document.querySelector('#pause').onclick=e=>{paused=!paused;e.target.textContent=paused?'Resume':'Pause';status.textContent=paused?'Preview paused':'Resuming…';};
+function point(e){const r=screen.getBoundingClientRect();return {x:Math.max(0,Math.min(screen.naturalWidth-1,Math.floor((e.clientX-r.left)*screen.naturalWidth/r.width))),y:Math.max(0,Math.min(screen.naturalHeight-1,Math.floor((e.clientY-r.top)*screen.naturalHeight/r.height)))};}
+screen.onpointerdown=e=>{if(control){start=point(e);screen.setPointerCapture(e.pointerId);}};
+screen.onpointercancel=()=>{start=null;};
+screen.onpointerup=e=>{if(!start)return;const end=point(e),first=start;start=null;send(Math.hypot(first.x-end.x,first.y-end.y)>15?{kind:'swipe',...first,x2:end.x,y2:end.y}:{kind:'tap',...end});};
+refresh();
+</script>
+</html>
