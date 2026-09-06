@@ -24,6 +24,7 @@ BuildRequires:  tar
 BuildRequires:  gzip
 Requires:       python3 >= 3.10
 Requires:       /usr/bin/adb
+Requires:       /usr/bin/avahi-browse
 Requires:       libgtk-3.so.0()(64bit)
 Requires:       libnss3.so()(64bit)
 Requires:       libXss.so.1()(64bit)

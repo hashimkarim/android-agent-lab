@@ -1,0 +1,144 @@
+name: Publish package repositories
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Published stable release tag
+        required: true
+        type: string
+    secrets:
+      AUR_SSH_PRIVATE_KEY:
+        required: false
+      HOMEBREW_SSH_PRIVATE_KEY:
+        required: false
+      COPR_CONFIG:
+        required: false
+      PPA_GPG_PRIVATE_KEY:
+        required: false
+      PPA_GPG_PASSPHRASE:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable release tag, for example v0.3.1
+        required: true
+        type: string
+      platform:
+        description: Publish or retry one channel independently
+        type: choice
+        default: all
+        options: [all, aur, homebrew, copr, ppa]
+      dry_run:
+        description: Build, install and smoke-test without publishing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    outputs:
+      platforms: ${{ steps.release.outputs.platforms }}
+      dry_run: ${{ steps.release.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate helpers and the existing release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          PLATFORM: ${{ inputs.platform || 'all' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+        run: |
+          python3 -m unittest discover -s tools/publish/tests -v
+          python3 tools/publish/scripts/release-info.py "$RELEASE_TAG"
+          python3 - <<'PY'
+          import json, os
+          all_platforms = ['aur', 'homebrew', 'copr', 'ppa']
+          selected = os.environ['PLATFORM']
+          if selected not in ['all', *all_platforms]:
+              raise SystemExit('Unknown package platform')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('platforms=' + json.dumps(all_platforms if selected == 'all' else [selected]) + '\n')
+              output.write('dry_run=' + os.environ['DRY_RUN'] + '\n')
+          PY
+
+  publish:
+    needs: validate
+    name: ${{ matrix.platform }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.validate.outputs.platforms) }}
+    concurrency:
+      group: android-agent-lab-package-${{ matrix.platform }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Download and verify released architecture bundles
+        run: |
+          echo "PREPARED=$RUNNER_TEMP/prepared" >> "$GITHUB_ENV"
+          python3 tools/publish/scripts/release-info.py "$RELEASE_TAG"
+          gh release download "$RELEASE_TAG" --repo Hashim-K/android-agent-lab \
+            --pattern "Android-Agent-Lab-${RELEASE_TAG#v}-x64.tar.gz" \
+            --pattern "Android-Agent-Lab-${RELEASE_TAG#v}-arm64.tar.gz" \
+            --pattern SHA256SUMS --dir "$RUNNER_TEMP/assets"
+          python3 scripts/prepare_distribution.py --tag "$RELEASE_TAG" \
+            --assets "$RUNNER_TEMP/assets" --output "$RUNNER_TEMP/prepared"
+      - name: Install upload clients
+        if: needs.validate.outputs.dry_run == 'false' && (matrix.platform == 'copr' || matrix.platform == 'ppa')
+        run: |
+          sudo apt-get update
+          if [[ "$PLATFORM" == copr ]]; then
+            sudo apt-get install -y --no-install-recommends python3-venv
+            python3 -m venv "$RUNNER_TEMP/copr-client"
+            "$RUNNER_TEMP/copr-client/bin/pip" install copr-cli
+            echo "$RUNNER_TEMP/copr-client/bin" >> "$GITHUB_PATH"
+          else
+            sudo apt-get install -y --no-install-recommends devscripts dput gnupg
+          fi
+      - name: Dry run — build, install and launch
+        if: needs.validate.outputs.dry_run == 'true'
+        env:
+          DRY_RUN: 'true'
+        run: bash tools/publish/scripts/publish-platform.sh "$PLATFORM" "$PREPARED"
+      - name: Validate and publish
+        if: needs.validate.outputs.dry_run == 'false'
+        env:
+          DRY_RUN: 'false'
+          AUR_SSH_PRIVATE_KEY: ${{ matrix.platform == 'aur' && secrets.AUR_SSH_PRIVATE_KEY || '' }}
+          AUR_SSH_KNOWN_HOSTS: ${{ vars.AUR_SSH_KNOWN_HOSTS }}
+          HOMEBREW_SSH_PRIVATE_KEY: ${{ matrix.platform == 'homebrew' && secrets.HOMEBREW_SSH_PRIVATE_KEY || '' }}
+          HOMEBREW_TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY }}
+          COPR_CONFIG: ${{ matrix.platform == 'copr' && secrets.COPR_CONFIG || '' }}
+          PPA_GPG_PRIVATE_KEY: ${{ matrix.platform == 'ppa' && secrets.PPA_GPG_PRIVATE_KEY || '' }}
+          PPA_GPG_PASSPHRASE: ${{ matrix.platform == 'ppa' && secrets.PPA_GPG_PASSPHRASE || '' }}
+          PPA_GPG_FINGERPRINT: ${{ vars.PPA_GPG_FINGERPRINT }}
+        run: bash tools/publish/scripts/publish-platform.sh "$PLATFORM" "$PREPARED"
+      - name: Save public package evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publishing-${{ inputs.tag }}-${{ matrix.platform }}-${{ github.run_attempt }}
+          retention-days: 7
+          compression-level: 0
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/prepared/manifest.json
+            ${{ runner.temp }}/prepared/aur/PKGBUILD
+            ${{ runner.temp }}/prepared/homebrew/Formula/android-agent-lab.rb
+            ${{ runner.temp }}/prepared/rpm/SPECS/android-agent-lab.spec
+            ${{ runner.temp }}/prepared/results/${{ matrix.platform }}/

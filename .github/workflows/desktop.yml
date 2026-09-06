@@ -86,6 +86,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      stable: ${{ steps.release.outputs.stable }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -93,16 +95,34 @@ jobs:
           path: release
           merge-multiple: true
       - name: Prepare checksums and release
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           python3 - <<'PY'
-          import hashlib, os, json, shutil
+          import hashlib, os, json, re, shutil
           from pathlib import Path
-          assert os.environ['RELEASE_TAG'] == 'v' + json.loads(Path('desktop/package.json').read_text())['version']
+          tag = os.environ['RELEASE_TAG']
+          assert tag == 'v' + json.loads(Path('desktop/package.json').read_text())['version']
+          stable = bool(re.fullmatch(r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', tag))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('stable=' + str(stable).lower() + '\n')
           shutil.copy2('scripts/install_appimage.py', 'release/install_appimage.py')
           root = Path('release')
           (root / 'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in sorted(root.iterdir()) if p.is_file()))
           PY
-          gh release create "$RELEASE_TAG" release/* --verify-tag --title "Android Agent Lab $RELEASE_TAG" --notes-file desktop/RELEASE_NOTES.md
+          release_flags=()
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            release_flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" release/* --verify-tag --title "Android Agent Lab $RELEASE_TAG" --notes-file desktop/RELEASE_NOTES.md "${release_flags[@]}"
+
+  publish-packages:
+    needs: release
+    if: needs.release.outputs.stable == 'true'
+    # GITHUB_TOKEN-created releases do not trigger another release-event workflow.
+    uses: ./.github/workflows/publish-packages.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit

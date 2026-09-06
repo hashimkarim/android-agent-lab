@@ -1,0 +1,25 @@
+name: Publishing checks
+
+on:
+  push:
+    paths: ['tools/publish/**', 'packaging/**', 'scripts/prepare_distribution.py', '.github/workflows/**']
+  pull_request:
+    paths: ['tools/publish/**', 'packaging/**', 'scripts/prepare_distribution.py', '.github/workflows/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Test release validation and retry behavior
+        run: python3 -m unittest discover -s tools/publish/tests -v
+      - name: Check shell scripts and workflow expressions
+        run: |
+          shellcheck tools/publish/scripts/*.sh tools/publish/checks/*.sh
+          docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:latest -color

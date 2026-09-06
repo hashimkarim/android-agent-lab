@@ -87,42 +87,115 @@ menu entries, and provide an `android-agent-lab` terminal launcher that clears
 `ELECTRON_RUN_AS_NODE`. AUR installs into `/usr/lib/android-agent-lab`, RPM/DEB
 into `/opt/android-agent-lab`, and Homebrew into its versioned Cellar.
 
-After publishing a new desktop release, update the version in the AUR recipe,
-Homebrew formula, RPM spec, and Debian changelog. Update the architecture-specific
-checksums in AUR and Homebrew from that release's `SHA256SUMS`. Increment distro
-revisions for packaging-only changes. Never replace assets beneath an existing
-version: their hashes are pinned by package managers.
+### Automatic stable releases
 
-Download the release assets into a local directory, then stage the packages:
+[`desktop.yml`](../.github/workflows/desktop.yml) tests and builds both architectures,
+checks that the tag matches `desktop/package.json`, then creates the GitHub release
+and its checksums. After a stable `vMAJOR.MINOR.PATCH` release, it calls
+[`publish-packages.yml`](../.github/workflows/publish-packages.yml) directly. This
+also works when the release was created with `GITHUB_TOKEN`, whose events do not
+start another release-triggered workflow. Prereleases stay on GitHub.
+
+Versions and hashes are generated from the selected release; checked-in recipe
+versions are templates and do not need manual bumps for each upstream release.
+Both `.tar.gz` bundles must match the published `SHA256SUMS`. The preparer checks
+ELF architectures, required runtime resources, the embedded app version, matching
+app code between architectures, and archive paths before staging distro packages.
+Never replace assets beneath an existing tag.
+
+Each platform runs independently and serializes updates to its package repository:
+
+| Channel | Required validation before upload | Destination |
+| --- | --- | --- |
+| AUR | Unprivileged `makepkg`, generated `.SRCINFO`, package installation and app smoke test | `aur.archlinux.org/android-agent-lab-bin.git`; only `PKGBUILD` and `.SRCINFO` |
+| Homebrew | Install the generated formula in an isolated tap, `brew test`, app smoke test | `Hashim-K/homebrew-tap`, only `Formula/android-agent-lab.rb` |
+| COPR | Build the complete SRPM and RPM in Fedora 44, install and smoke-test the RPM | `hashimkarim/android-agent-lab`; existing Fedora 43/44 x86_64 and aarch64 chroots |
+| PPA | Build unsigned source on Ubuntu 24.04, extract its `.dsc`, build/install the binary, app smoke test | Signed source `.changes` to `ppa:hashimkarim/android-agent-lab`, Noble amd64 |
+
+Smoke tests use Xvfb as a normal user with a fresh profile. They check Python,
+bundled Node, renderer isolation and H.264 support without interacting with Android
+devices. These distro checks run on x86_64; the desktop release workflow separately
+builds and tests ARM64 natively. COPR subsequently builds both enabled architectures.
+The PPA's enabled architectures and series are preserved.
+
+### Dry runs and retries
+
+In Actions, run **Publish package repositories** with the latest existing stable
+tag. `dry_run` defaults to `true`; select `all` or one platform. Dry runs execute
+the same package builds and installation checks, without passing platform secrets
+to the step or uploading packages. Inspect the logs and `publishing-*` artifacts.
+
+After the workflow is on the default branch, a CLI equivalent is:
 
 ```bash
-python3 scripts/prepare_distribution.py \
-  --assets .lab/release-downloads --output .lab/distribution-next
+gh workflow run publish-packages.yml --repo Hashim-K/android-agent-lab \
+  -f tag=v0.2.0 -f platform=all -F dry_run=true
 ```
 
-The script verifies all four required archives against the release checksums and
-pinned recipe hashes. It rejects mismatched versions and existing output
-directories. It stages AUR and Homebrew recipes, an RPM build tree with both
-architectures, and a Debian source tree with its upstream tarball. It does not
-read credentials or publish anything.
+Use the current latest tag. To publish or retry a specific platform, choose that
+platform and explicitly set `dry_run=false`. The workflow checks the latest stable
+release again immediately before writing. It rejects downgrades and checks existing
+submissions before uploading. API failures fail the job; they never count as an
+absent package. Pending COPR/PPA submissions are polled with cache revalidation and
+a 45-minute limit. A timeout does not cancel the remote build: check it before retrying.
+Already published versions are reused, and the other channels need not be rerun.
 
-Build and check on the corresponding distro, using a clean container or VM:
+For a failed COPR build, retry the platform job. For a failed Launchpad build, use
+Launchpad's **Retry build** and rerun the PPA job to observe publication. Launchpad
+does not allow reuploading the same Debian version. For a packaging-only change,
+increment the distro revision and preserve the original upstream tarball; do not
+regenerate a different `.orig.tar.gz` under a used upstream version. The generator
+retains the existing `0.2.0-1ppa2` revision; subsequent upstream versions start at
+`-1ppa1`. Updating packaging revisions requires a deliberate recipe/helper change.
+Installed Debian timestamps are normalized with `SOURCE_DATE_EPOCH` because
+Launchpad rejects epoch-zero payload timestamps.
 
-| Channel | Build / validation | Publish |
+### Repository configuration
+
+Configure these Actions secrets and variables on the **source** repository:
+
+| Platform | Secrets | Variables |
 | --- | --- | --- |
-| AUR | `makepkg -s`, `namcap PKGBUILD`, `namcap android-agent-lab-bin-*.pkg.tar.zst`, `makepkg --printsrcinfo > .SRCINFO` | Push only `PKGBUILD` and `.SRCINFO` to `ssh://aur@aur.archlinux.org/android-agent-lab-bin.git` |
-| Homebrew | `brew readall --os=all --arch=all hashim-k/tap`, `brew style`, install and `brew test hashim-k/tap/android-agent-lab` | Copy the formula into `Hashim-K/homebrew-tap` and push its `main` |
-| COPR | `rpmbuild -ba --define "_topdir /absolute/staging/rpm" packaging/rpm/android-agent-lab.spec` | `copr-cli build hashimkarim/android-agent-lab /absolute/staging/rpm/SRPMS/*.src.rpm` |
-| PPA | In the staged source tree on Ubuntu 24.04: `dpkg-buildpackage -us -uc -S -sa` and `dpkg-buildpackage -us -uc -b` | Sign the source `.changes` with `debsign`, then `dput ppa:hashimkarim/android-agent-lab /absolute/staging/ppa/*_source.changes` |
+| AUR | `AUR_SSH_PRIVATE_KEY` | `AUR_SSH_KNOWN_HOSTS` (verified host keys) |
+| Homebrew | `HOMEBREW_SSH_PRIVATE_KEY` | `HOMEBREW_TAP_REPOSITORY=Hashim-K/homebrew-tap` |
+| COPR | `COPR_CONFIG` (existing copr-cli configuration) | Destination is fixed in the helper |
+| PPA | `PPA_GPG_PRIVATE_KEY`; optional `PPA_GPG_PASSPHRASE` | `PPA_GPG_FINGERPRINT` |
 
-Ubuntu build tools are `build-essential`, `debhelper`, `dh-apparmor`, `devscripts`,
-and `dput`. RPM builds need `rpm-build`, `coreutils`, `tar`, and `gzip`. Arch builds
-need `base-devel` and `namcap`. Do not upload built binary archives to AUR Git.
+Missing configuration fails the affected platform explicitly. The Homebrew deploy
+key needs write access only to the tap. Register the AUR key on the maintainer's
+account and the OpenPGP key on Launchpad. Use a signing subkey for CI; keep the
+primary private key local. Reuse the existing COPR token: creating another personal
+token invalidates the previous one. Platform secrets never enter the package-test
+containers or public artifacts; temporary credential files are removed on exit.
 
-Before publication, install each package and run `android-agent-lab --smoke-test`
-as a normal user with a fresh `ADB_LAB_USER_DATA` directory and a GUI session or
-Xvfb. This verifies the app version, Python, bundled Node, renderer isolation and
-H.264 support without interacting with Android devices. Verify the desktop entry
-with `desktop-file-validate`. The initial release passed these installation checks
-on Arch, Fedora 44, Ubuntu 24.04, and Homebrew on Linux; upstream release CI also
-tested the native ARM64 desktop build.
+Maintainers using the private `linux-deploy` toolkit can preview and install this
+configuration with its `scripts/secrets.py install --repo Hashim-K/android-agent-lab
+--platform aur homebrew copr ppa`, then `--apply`. Do not copy its `.env` into this
+repository. Existing credential sets are preserved unless replacement is explicitly
+requested. Fork maintainers must change the recipe URLs, helper destinations and
+workflow repository names to accounts they control, and register their own keys.
+
+### Local validation
+
+Python 3.10+, Docker and GitHub CLI are sufficient for a local dry run. Use a native
+Linux filesystem with several GB free for staging; Electron's profile and sandbox
+tests need normal Unix permissions. Download and prepare once, then validate each
+platform (the output directory must not exist yet):
+
+```bash
+tag=v0.2.0
+staging="$HOME/.cache/android-agent-lab-publishing/$tag"
+python3 tools/publish/scripts/release-info.py "$tag"
+gh release download "$tag" --repo Hashim-K/android-agent-lab \
+  --pattern '*.tar.gz' --pattern SHA256SUMS --dir "$staging/assets"
+python3 scripts/prepare_distribution.py --tag "$tag" \
+  --assets "$staging/assets" --output "$staging/prepared"
+for platform in aur homebrew copr ppa; do
+  DRY_RUN=true RELEASE_TAG="$tag" bash tools/publish/scripts/publish-platform.sh \
+    "$platform" "$staging/prepared"
+done
+python3 -m unittest discover -s tools/publish/tests -v
+```
+
+[`publishing-tests.yml`](../.github/workflows/publishing-tests.yml) runs the regression
+tests, ShellCheck and actionlint on changes to publishing helpers, recipes or workflows.

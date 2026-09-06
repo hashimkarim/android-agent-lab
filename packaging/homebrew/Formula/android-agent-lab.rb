@@ -54,6 +54,7 @@ class AndroidAgentLab < Formula
     <<~EOS
       Requires a Linux desktop with GTK 3, NSS, GBM and ALSA libraries, plus adb.
       Install adb using your distro's android-tools/adb package or Android SDK.
+      For nearby discovery with distro adb, install and enable Avahi.
       Docker with Compose and /dev/kvm is optional for the x86_64 Android emulator.
 
       Launch with: android-agent-lab
