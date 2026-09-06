@@ -75,25 +75,39 @@ sys.exit(int(os.environ.get('FAKE_EXIT','0')))
         self.assertNotEqual(old["token"], new["token"])
 
     def test_live_operation_blocks_expired_takeover_but_other_devices_work(self):
-        old = self.claim(ttl=1)
+        # URL-safe tokens can begin with '-'; pass them as explicit option values.
+        with patch.object(coord.secrets, "token_urlsafe", return_value="-coordination-test-token"):
+            old = self.claim()
+        gate = self.root / "finish-adb"
         command = [sys.executable, str(Path(coord.__file__)), "run", "--serial", old["serial"],
-                   "--token", old["token"], "--", "get-state"]
-        process = subprocess.Popen(command, env={**os.environ, "FAKE_DELAY": "2"}, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                   "--token=" + old["token"], "--", "get-state"]
+        process = subprocess.Popen(command, env={**os.environ, "FAKE_GATE": str(gate)}, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            deadline = time.monotonic() + 5
-            while not (self.root / "argv").exists() and time.monotonic() < deadline:
+            deadline = time.monotonic() + 10
+            while not (self.root / "argv").exists() and process.poll() is None and time.monotonic() < deadline:
                 time.sleep(.02)
-            self.assertTrue((self.root / "argv").exists())
-            time.sleep(1.1)
+            if process.poll() is not None:
+                _, stderr = process.communicate()
+                self.fail(f"Coordinator exited before fake ADB started: {stderr.decode(errors='replace')}")
+            self.assertTrue((self.root / "argv").exists(), f"Fake ADB did not start; coordinator exit: {process.poll()}")
+            # Expire the stored lease only after ADB holds the operation lock.
+            # The gate keeps it running without relying on process scheduling.
+            current = coord.read_record(coord.record_path(old["serial"]))
+            current["expires_at"] = time.time() - 1
+            coord.save_record(coord.record_path(old["serial"]), current)
             with self.assertRaisesRegex(coord.CoordinationError, "operation in progress"):
                 coord.claim(old["serial"], "t3:two", str(self.root), reclaim=True)
             self.claim("emulator-5582")
+            gate.touch()
             process.communicate(timeout=5)
             self.assertEqual(process.returncode, 0)
             current = coord.read_record(coord.record_path(old["serial"]))
             self.assertGreater(current["expires_at"], time.time())
         finally:
-            if process.poll() is None:
+            gate.touch()
+            try:
+                process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
                 process.kill()
                 process.communicate()
 
