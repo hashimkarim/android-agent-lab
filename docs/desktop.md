@@ -80,7 +80,7 @@ This creates a launcher and icon in your application menu, stores the image in
 `~/.local/opt/android-agent-lab`, and adds `~/.local/bin/android-agent-lab`.
 No root access is needed. Run the installer again with a newer image to update.
 The image must be trusted: installation invokes its built-in icon extractor.
-Use the `aarch64` AppImage on ARM64. If `android-agent-lab` is not found, add
+Use the `arm64.AppImage` asset on ARM64. If `android-agent-lab` is not found, add
 `export PATH="$HOME/.local/bin:$PATH"` to your shell configuration and open a
 new terminal, or run `~/.local/bin/android-agent-lab` directly.
 
