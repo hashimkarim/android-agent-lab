@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import subprocess
 import sys
 import unittest
 from unittest.mock import patch
@@ -56,3 +57,20 @@ class VideoTests(unittest.TestCase):
         file.write_bytes(b'wrong server')
         with self.assertRaises(video.coord.CoordinationError):
             video.verify_server(file)
+
+    def test_display_query_supports_watch_sizes_and_prefers_android_override(self):
+        for output, expected in [('Physical size: 450x450', (450, 450)),
+                                 ('Physical size: 1080x2400\nOverride size: 720x1600', (720, 1600))]:
+            with patch.object(video.subprocess, 'run', side_effect=[subprocess.CompletedProcess([], 0, 'device\n', ''),
+                    subprocess.CompletedProcess([], 0, output, '')]) as run:
+                self.assertEqual(video.display_size('192.168.1.159:43443'), expected)
+                self.assertEqual(run.call_args.args[0][-5:], ['-s', '192.168.1.159:43443', 'shell', 'wm', 'size'])
+
+    def test_offline_and_slow_watch_have_actionable_errors_before_scrcpy_start(self):
+        with patch.object(video.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, '', 'error: device offline')) as run:
+            with self.assertRaisesRegex(video.coord.CoordinationError, 'device offline.*Update connection'):
+                video.display_size('192.168.44.96:34651')
+            self.assertEqual(run.call_count, 1)
+        with patch.object(video.subprocess, 'run', side_effect=[subprocess.CompletedProcess([], 0, 'device\n', ''), subprocess.TimeoutExpired('adb', 10)]):
+            with self.assertRaisesRegex(video.coord.CoordinationError, 'current IP and connection port'):
+                video.display_size('192.168.44.96:34651')

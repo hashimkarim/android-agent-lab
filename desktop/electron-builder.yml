@@ -36,6 +36,7 @@ deb:
   depends:
     - python3 (>= 3.10)
     - adb
+    - avahi-utils
     - libgtk-3-0
     - libnss3
     - libxss1
@@ -50,6 +51,7 @@ rpm:
   depends:
     - python3 >= 3.10
     - /usr/bin/adb
+    - /usr/bin/avahi-browse
     - libgtk-3.so.0()(64bit)
     - libnss3.so()(64bit)
     - libXss.so.1()(64bit)
@@ -70,6 +72,7 @@ pacman:
   depends:
     - python
     - android-tools
+    - avahi
     - gtk3
     - nss
     - libxss

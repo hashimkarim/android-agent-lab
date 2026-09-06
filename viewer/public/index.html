@@ -2,7 +2,7 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Android Agent Lab · Live device</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<header><div><strong>Android Agent Lab</strong><span id="device">Connecting…</span></div><div class="view-options"><label for="cursor-mode">Cursors</label><select id="cursor-mode"><option value="agents">Agents only</option><option value="all" selected>Agents and user</option></select><button id="reload" title="Reconnect to this session">Reconnect</button></div></header>
+<header><div><strong>Android Agent Lab</strong><span id="device">Connecting…</span></div><div class="view-options"><label for="cursor-mode">Cursors</label><select id="cursor-mode"><option value="none" title="Keep the system pointer; hide shared cursor overlays">No cursors</option><option value="agents">Agents only</option><option value="all" selected>Agents and user</option></select><button id="reload" title="Reconnect to this session">Reconnect</button></div></header>
 <div class="workspace">
   <aside class="toolbar" aria-label="Android device controls">
     <div class="tool-group"><button data-key="POWER" title="Power / lock screen" aria-label="Power">⏻</button><button data-key="VOLUME_UP" title="Volume up" aria-label="Volume up">＋<small>VOL</small></button><button data-key="VOLUME_DOWN" title="Volume down" aria-label="Volume down">−<small>VOL</small></button><button data-rotation="rotate" title="Rotate and lock orientation" aria-label="Rotate device">⟳</button></div>
@@ -13,12 +13,19 @@
   <aside class="developer-tools" aria-label="Developer tools">
     <h2>Developer tools</h2><button id="install-apk"><span aria-hidden="true">↥</span> <span>Install APK</span></button><input id="apk-file" type="file" accept=".apk" hidden>
     <button data-tool="logcat"><span aria-hidden="true">≡</span> <span>Logcat</span></button><button data-tool="hierarchy"><span aria-hidden="true">⌘</span> <span>UI hierarchy</span></button><button data-tool="developer-options"><span aria-hidden="true">⚙</span> <span>Developer options</span></button><button data-tool="app-settings"><span aria-hidden="true">▦</span> <span>App settings</span></button><button data-tool="settings"><span aria-hidden="true">⚙</span> <span>Device settings</span></button>
-    <h2>Display</h2><div class="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit" title="Fit the entire device">Fit</button><button id="zoom-in" aria-label="Zoom in">＋</button></div><button id="fullscreen"><span aria-hidden="true">⛶</span> <span>Fullscreen</span></button><button data-command="reset-video"><span aria-hidden="true">↻</span> <span>Refresh video</span></button><p id="video-stats" class="muted">Waiting for video…</p>
+    <h2>Display</h2><div class="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit" title="Fit the entire device">Fit</button><button id="zoom-in" aria-label="Zoom in">＋</button></div><button id="fullscreen"><span aria-hidden="true">⛶</span> <span>Fullscreen</span></button><button data-command="reset-video"><span aria-hidden="true">↻</span> <span>Refresh video</span></button><p id="video-stats" class="muted" title="Control ACK measures browser-to-scrcpy acknowledgement, not motion-to-display latency. FPS drops to zero on a still screen.">Waiting for video…</p>
     <button data-rotation="auto-rotate" title="Restore sensor rotation"><span aria-hidden="true">⟳</span> <span>Auto-rotate</span></button>
     <h2>Text &amp; clipboard</h2><form id="text-form"><label class="sr-only" for="text">Text to paste to Android</label><textarea id="text" rows="3" placeholder="Paste text, including Unicode…" autocomplete="off"></textarea><button id="send-text">Paste to device</button></form><p class="muted">Uses the device clipboard. Click the screen for keyboard input.</p>
   </aside>
 </div>
 <section id="tool-panel" hidden aria-label="Developer tool output"><div class="panel-heading"><strong id="tool-title">Output</strong><div><button id="tool-refresh">Refresh</button><button id="tool-save">Save</button><button id="tool-close" aria-label="Close output panel">×</button></div></div><pre id="tool-output" tabindex="0"></pre></section>
 <footer><span id="status" role="status">Starting video…</span><span id="activity" role="status">Agent cursors ready</span></footer>
+<dialog id="install-dialog" aria-labelledby="install-title">
+  <div class="picker-heading"><div><h2 id="install-title">Install an APK</h2><p id="install-target"></p></div><button id="install-close" aria-label="Close APK picker">×</button></div>
+  <div class="picker-search"><input id="install-search" type="search" placeholder="Search projects and APKs" aria-label="Search projects and APKs"><button id="install-library-refresh">Refresh</button></div>
+  <p id="install-status" role="status"></p>
+  <div class="picker-library"><h3>Local projects</h3><div id="install-projects"></div><h3>Saved APKs</h3><div id="install-saved"></div></div>
+  <div class="picker-footer"><span>Choose an APK from your computer</span><button id="install-browse">Browse files…</button></div>
+</dialog>
 <script type="module" src="/client.js"></script>
 </body></html>

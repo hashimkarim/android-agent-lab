@@ -1,5 +1,7 @@
-import {WebCodecsVideoDecoder, BitmapVideoFrameRenderer} from '@yume-chan/scrcpy-decoder-webcodecs';
+import {WebCodecsVideoDecoder} from '@yume-chan/scrcpy-decoder-webcodecs';
 import {createCursors} from './cursors.js';
+import {VideoPacketQueue, DirectCanvasRenderer} from './latency.mjs';
+import {createInstaller} from './install.js';
 window.addEventListener('hashchange', () => location.reload());
 const $ = id => document.getElementById(id);
 const key = new URLSearchParams(location.hash.slice(1)).get('key');
@@ -7,8 +9,10 @@ const browserActor = sessionStorage.getItem('adb-video-actor') || `human:browser
 sessionStorage.setItem('adb-video-actor', browserActor);
 const actor = new URLSearchParams(location.hash.slice(1)).get('actor') || browserActor;
 const canvas = $('screen'), status = $('status');
+const cursorMode = $('cursor-mode');
 let decoder, writer, settings, socket, control, pressed = null, lastPoint, motion = null, frameTask = 0, ready = false;
 let nextId = 0, zoom = null, currentTool, recording, recordingTimer;
+let packets;
 const pending = new Map();
 function dimensions() {
   if (!settings) return null;
@@ -16,7 +20,7 @@ function dimensions() {
   if ((canvas.width > canvas.height) !== (width > height)) [width,height]=[height,width];
   return {width,height};
 }
-const cursors = createCursors($('cursors'), canvas, $('cursor-mode'), $('activity'), actor, dimensions);
+const cursors = createCursors($('cursors'), canvas, cursorMode, $('activity'), actor, dimensions);
 function fit() {
   if (!ready) return;
   const space=$('viewport'), style=getComputedStyle(space);
@@ -40,7 +44,7 @@ async function api(path, data, binary=false) {
 function send(data, reliable=true) {
   if (control?.readyState!==WebSocket.OPEN || (data.kind!=='hover' && !settings?.control)) return Promise.resolve(false);
   // Preserve down/up; stale movement never accumulates behind an obstructed socket.
-  if (control.bufferedAmount>65536 && (data.kind==='hover' || data.phase==='move')) return Promise.resolve(false);
+  if (control.bufferedAmount>4096 && (data.kind==='hover' || data.phase==='move')) return Promise.resolve(false);
   const id = reliable ? ++nextId : undefined;
   const result = reliable ? new Promise(resolve=>{
     const timer=setTimeout(()=>{pending.delete(id);status.textContent='Input response timed out.';resolve(false);},10000);
@@ -55,6 +59,7 @@ function point(event) {
     y:Math.max(0,Math.min(canvas.height-1,Math.round((event.clientY-r.top)/r.height*canvas.height))),width:canvas.width,height:canvas.height};
 }
 function localPointer(p,phase='hover') {
+  if (cursorMode.value==='none') return;
   const d=dimensions();if (!d) return;
   cursors.receive({now:Date.now(),events:[{id:'local-pointer',actor,kind:'pointer',phase,persistent:true,pressed:pressed!==null,
     points:[p.x/p.width*d.width,p.y/p.height*d.height],at:Date.now()/1000}]},true);
@@ -64,15 +69,25 @@ function flushMotion() {
   if (!motion) return;
   const p=motion;motion=null;
   if (pressed!==null) send({kind:'pointer',phase:'move',...p},false);
-  else send({kind:'hover',...p},false);
+  else if (cursorMode.value!=='none') send({kind:'hover',...p},false);
 }
+cursorMode.addEventListener('change',()=>{
+  if (cursorMode.value!=='none') return;
+  if (pressed===null) {cancelAnimationFrame(frameTask);frameTask=0;motion=null;}
+  // Retire any previous hover marker in other viewers once, then stop tracking.
+  send({kind:'hover',phase:'leave'},false);
+});
 canvas.onpointermove=e=>{
   if (!ready || e.pointerType==='touch' && pressed===null) return;
+  if (pressed===null && cursorMode.value==='none') return;
   lastPoint=point(e);localPointer(lastPoint);motion=lastPoint;
-  if (!frameTask) frameTask=requestAnimationFrame(flushMotion);
+  // Pointer input should not wait for video's next animation frame. Browser
+  // pointermove is already coalesced; the server retains only pending latest moves.
+  if (pressed!==null) flushMotion();
+  else if (!frameTask) frameTask=requestAnimationFrame(flushMotion);
 };
-canvas.onpointerenter=e=>{if (ready) {lastPoint=point(e);localPointer(lastPoint);send({kind:'hover',...lastPoint},false);}};
-canvas.onpointerleave=()=>{if (pressed===null && lastPoint) {flushMotion();localPointer(lastPoint,'leave');send({kind:'hover',phase:'leave'},false);}};
+canvas.onpointerenter=e=>{if (ready && cursorMode.value!=='none') {lastPoint=point(e);localPointer(lastPoint);send({kind:'hover',...lastPoint},false);}};
+canvas.onpointerleave=()=>{if (pressed===null && lastPoint && cursorMode.value!=='none') {flushMotion();localPointer(lastPoint,'leave');send({kind:'hover',phase:'leave'},false);}};
 canvas.onpointerdown=e=>{
   if (!ready || !settings?.control || pressed!==null) return;
   if (e.button===2) {e.preventDefault();send({kind:'key',key:'BACK'});return;}
@@ -129,14 +144,29 @@ async function runTool(tool) {
 }
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>runTool(b.dataset.tool));
 $('tool-close').onclick=()=>{$('tool-panel').hidden=true;};
-$('tool-refresh').onclick=()=>runTool(currentTool);
+$('tool-refresh').onclick=()=>currentTool?.startsWith('install:') ? followInstall(currentTool.slice(8)) : runTool(currentTool);
 $('tool-save').onclick=()=>download(new Blob([$('tool-output').textContent],{type:currentTool==='hierarchy'?'application/xml':'text/plain'}),`${currentTool}-${stamp()}.${currentTool==='hierarchy'?'xml':'txt'}`);
 $('screenshot').onclick=async()=>{
   $('screenshot').disabled=true;
   try{const result=await api('/devtools',{tool:'screenshot'});download(new Blob([Uint8Array.from(atob(result.image),c=>c.charCodeAt(0))],{type:'image/png'}),`android-${stamp()}.png`);status.textContent='Full-resolution screenshot saved.';}
   catch(e){status.textContent=e.message;}finally{enabled();}
 };
-$('install-apk').onclick=()=>$('apk-file').click();
+async function followInstall(id) {
+  const jobMarker=`install:${id}`;currentTool=jobMarker;
+  $('tool-panel').hidden=false;$('tool-title').textContent='Install APK';$('tool-output').textContent='Starting…';$('tool-refresh').disabled=true;
+  try {
+    while(currentTool===jobMarker) {
+      const job=await api(`/library/job/${encodeURIComponent(id)}`);
+      if(currentTool!==jobMarker)return;
+      $('tool-title').textContent=`${job.label} · ${job.state}`;$('tool-output').textContent=job.log||'Waiting for output…';
+      if(!job.running){status.textContent=`${job.label}: ${job.state.toLowerCase()}.`;return;}
+      await new Promise(resolve=>setTimeout(resolve,1000));
+    }
+  } catch(error){if(currentTool===jobMarker){$('tool-output').textContent=error.message;status.textContent=error.message;}}
+  finally{if(currentTool===jobMarker)$('tool-refresh').disabled=false;}
+}
+const installer=createInstaller(api,()=>settings?.serial||'this device',id=>void followInstall(id));
+$('install-apk').onclick=()=>installer.open();
 $('apk-file').onchange=async()=>{
   const file=$('apk-file').files[0];if (!file) return;
   currentTool='install';$('tool-refresh').disabled=true;
@@ -168,21 +198,27 @@ try {
   };
   control.onclose=()=>{pressed=null;enabled();for (const p of pending.values()){clearTimeout(p.timer);p.resolve(false);}pending.clear();};
   socket=new WebSocket(`${prefix}/stream`,`adb-video.${key}`);socket.binaryType='arraybuffer';
-  let decoding=Promise.resolve();
   socket.onmessage=event=>{
     if (typeof event.data==='string') {
       const message=JSON.parse(event.data);
       if (message.type==='activity'){cursors.receive(message);return;}
-      decoder=new WebCodecsVideoDecoder({codec:message.codec,renderer:new BitmapVideoFrameRenderer(canvas)});writer=decoder.writable.getWriter();
-      decoder.sizeChanged(({width,height})=>{if ((canvas.width>canvas.height)!==(width>height)) {release();cursors.clear();}canvas.width=width;canvas.height=height;ready=true;fit();});
+      decoder?.dispose();packets?.close();
+      decoder=new WebCodecsVideoDecoder({codec:message.codec,renderer:new DirectCanvasRenderer(canvas)});writer=decoder.writable.getWriter();
+      packets=new VideoPacketQueue(packet=>writer.write(packet),e=>{status.textContent=e.message;socket.close();});
+      let previousWidth=0,previousHeight=0;
+      decoder.sizeChanged(({width,height})=>{
+        if(width===previousWidth&&height===previousHeight)return;
+        if(previousWidth && (previousWidth>previousHeight)!==(width>height)){release();cursors.clear();}
+        previousWidth=width;previousHeight=height;ready=true;fit();
+      });
       status.textContent=settings.control?'Live · direct scrcpy input':'Live · read-only';return;
     }
     const view=new DataView(event.data),flag=view.getUint8(0),data=new Uint8Array(event.data,9);
     const packet=flag===0?{type:'configuration',data}:{type:'data',keyframe:flag===2,pts:view.getBigUint64(1),data};
-    decoding=decoding.then(()=>writer.write(packet)).catch(e=>{status.textContent=e.message;socket.close();});
+    packets.push(packet);
   };
-  socket.onclose=()=>{release();cursors.clear();settings.control=false;control.close();enabled();recording?.stop();status.textContent='Video stopped. Check the claim, then reconnect.';};
+  socket.onclose=()=>{release();packets?.close();decoder?.dispose();cursors.clear();settings.control=false;control.close();enabled();recording?.stop();status.textContent='Video stopped. Check the claim, then reconnect.';};
   socket.onerror=()=>{status.textContent='Video connection failed.';};
   let lastFrames=0;
-  setInterval(()=>{if (decoder){const frames=decoder.framesRendered;canvas.dataset.framesRendered=String(frames);$('video-stats').textContent=`${canvas.width} × ${canvas.height} · ${frames-lastFrames} fps (${settings.maxFps} cap)`;lastFrames=frames;}},1000);
+  setInterval(()=>{if (decoder){const frames=decoder.framesRendered;canvas.dataset.framesRendered=String(frames);$('video-stats').textContent=`${canvas.width} × ${canvas.height} · ${frames-lastFrames} fps (${settings.maxFps} cap) · ${settings.profile || 'custom'}\nControl ACK: ${canvas.dataset.inputRtt || '—'} ms · queued packets: ${packets?.queue.length || 0} · dropped: ${packets?.dropped || 0}`;lastFrames=frames;}},1000);
 } catch(e){status.textContent=e.message;}

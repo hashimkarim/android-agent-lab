@@ -54,7 +54,9 @@ agents should append a URL-encoded actor to the existing private fragment,
 for example `#key=...&actor=codex%3Athread-id`. Ordinary browser input defaults
 to a human actor. Do not label agent automation as human input.
 
-The cursor selector has **Agents only** and **Agents and user** modes. Human
+The cursor selector has **No cursors**, **Agents only**, and **Agents and user** modes.
+No cursors keeps the system pointer visible and disables overlay and hover-only
+work while touch input continues directly over scrcpy. Human
 pointers are small circles that follow hover continuously, before any click.
 Browser agents also publish live hover positions; live pointers clear on leave
 or disconnect. CLI feedback retains its eight-second lifetime.

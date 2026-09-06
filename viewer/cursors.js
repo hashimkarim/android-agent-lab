@@ -1,12 +1,12 @@
 // Cursor feedback is drawn locally, outside Android capture and video decoding.
 export function createCursors(canvas, screen, mode, activity, ownActor, dimensions) {
-  const ctx = canvas.getContext('2d');
+  let ctx;
   const cursors = new Map();
   let latest, animation = 0, timer = 0, width = 0, height = 0;
   const lifetime = 8000;
   const names = {codex:'Codex',claude:'Claude',t3:'T3',human:'Human'};
   const actions = {tap:'Tap',swipe:'Drag',pointer:'Pointer',scroll:'Scroll',typing:'Typing',key:'Key input'};
-  const visible = actor => mode.value === 'all' || !actor.startsWith('human:');
+  const visible = actor => mode.value !== 'none' && (mode.value === 'all' || !actor.startsWith('human:'));
   function label(actor) {
     if (actor === ownActor && actor.startsWith('human:')) return 'You';
     const [client, ...rest] = actor.split(':');
@@ -20,8 +20,10 @@ export function createCursors(canvas, screen, mode, activity, ownActor, dimensio
     return `hsl(${hash%360} 78% 76%)`;
   }
   function showActivity(text) {if (activity.textContent!==text) activity.textContent=text;}
-  function wake() {clearTimeout(timer);timer=0;if (!animation) animation = requestAnimationFrame(draw);}
+  function wake() {if (mode.value==='none') return;clearTimeout(timer);timer=0;if (!animation) animation = requestAnimationFrame(draw);}
   const observer = new ResizeObserver(() => {
+    if (mode.value==='none') return;
+    ctx ||= canvas.getContext('2d');
     const box = screen.getBoundingClientRect(), ratio = devicePixelRatio || 1;
     width = box.width;height = box.height;
     canvas.style.left=screen.offsetLeft+'px';canvas.style.top=screen.offsetTop+'px';
@@ -29,9 +31,8 @@ export function createCursors(canvas, screen, mode, activity, ownActor, dimensio
     canvas.width = Math.round(width * ratio);canvas.height = Math.round(height * ratio);
     ctx.setTransform(ratio,0,0,ratio,0,0);wake();
   });
-  observer.observe(screen);
   function draw(now) {
-    animation = 0;ctx.clearRect(0,0,width,height);
+    animation = 0;if (mode.value==='none' || !ctx) return;ctx.clearRect(0,0,width,height);
     const rendered = [], labels = [];
     let nextWake = Infinity;
     const size = dimensions();
@@ -92,11 +93,25 @@ export function createCursors(canvas, screen, mode, activity, ownActor, dimensio
     if (nextWake===0) wake();
     else if (Number.isFinite(nextWake)) timer=setTimeout(wake,Math.max(1,nextWake));
   }
-  mode.onchange = () => {localStorage.setItem('adb-cursor-mode',mode.value);screen.style.cursor=mode.value==='all' ? 'none' : 'default';wake();};
-  mode.value=localStorage.getItem('adb-cursor-mode')==='agents' ? 'agents' : 'all';
+  function clear() {
+    cancelAnimationFrame(animation);animation=0;clearTimeout(timer);timer=0;
+    cursors.clear();latest=null;canvas.dataset.markers='[]';
+    showActivity(mode.value==='none'?'System cursor':'Agent cursors ready');
+    ctx?.clearRect(0,0,width,height);
+  }
+  mode.onchange = () => {
+    localStorage.setItem('adb-cursor-mode',mode.value);
+    screen.style.cursor=mode.value==='all' ? 'none' : 'default';
+    canvas.hidden=mode.value==='none';
+    clear();
+    if (mode.value==='none') observer.disconnect();
+    else {observer.observe(screen);wake();}
+  };
+  mode.value=['none','agents','all'].includes(localStorage.getItem('adb-cursor-mode')) ? localStorage.getItem('adb-cursor-mode') : 'all';
   mode.onchange();
   return {
     receive(message, local=false) {
+      if (mode.value==='none') return;
       for (const event of message.events || []) {
         if (typeof event.actor !== 'string' || !actions[event.kind]) continue;
         // Delayed broker feedback must never move a locally drawn live pointer backwards.
@@ -114,6 +129,6 @@ export function createCursors(canvas, screen, mode, activity, ownActor, dimensio
       }
       wake();
     },
-    clear() {cancelAnimationFrame(animation);animation=0;clearTimeout(timer);timer=0;cursors.clear();latest=null;canvas.dataset.markers='[]';activity.textContent='Agent cursors ready';ctx.clearRect(0,0,width,height);},
+    clear,
   };
 }

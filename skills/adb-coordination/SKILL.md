@@ -39,6 +39,12 @@ Keep the returned token in this thread's context or process-local
 `ADB_COORD_TOKEN`. Do not put it in source control, global instructions, shell
 startup files, or shared handoff notes. Status omits tokens.
 
+The desktop's **Lock for me** reserves a device across restarts and rotates its
+token. A record with `reserved: true` belongs to the human until they explicitly
+unlock it. Do not reclaim, release, renew, or hand off a human reservation, and
+do not read the desktop's private workspace file to obtain its token. Ask the
+human to unlock and copy fresh session instructions when the task needs it.
+
 ```bash
 python3 /path/to/skill/scripts/adb_coord.py run --serial SERIAL --token TOKEN -- install -r /absolute/app-debug.apk
 python3 /path/to/skill/scripts/adb_coord.py run --serial SERIAL --token TOKEN -- shell am start -W -n com.example.app/.MainActivity

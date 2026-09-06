@@ -219,3 +219,21 @@ The project reuses upstream capture and decoding instead of maintaining a
 scrcpy fork. [NetrisTV/ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) offers
 another browser UI, but its README documents a modified scrcpy 1.19 server
 (reviewed 2026-09-05). Tango lets this bridge use an official newer server.
+
+### Workspace release latency changes
+
+The desktop defaults to the Fast preset (960 px / 60 FPS / 3 Mbps). CLI users can
+pass `--profile fast`, `--profile balanced`, or `--profile detail` to `video.py
+start`. A profile overrides `--max-size`, `--max-fps`, and `--bit-rate`. The viewer
+avoids per-frame canvas resets, draws VideoFrames directly, bounds packet work,
+and coalesces pending pointer moves without losing down/up/cancel boundaries.
+**No cursors** keeps the native system pointer and disables the overlay,
+its animation/resize work, and hover-only network traffic. Actual touches and
+drags continue directly over scrcpy. Control ACK timing in the toolbar is not
+an end-to-end latency measurement.
+
+In a live desktop session, **Install APK** opens saved projects and APKs before
+offering **Browse files…**. Select an existing output, install a saved copy, or
+build and install a project on that same device. Library operations use the
+desktop job queue and recheck its current device token. A standalone viewer
+without a desktop library still supports the filesystem APK picker.

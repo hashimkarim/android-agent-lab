@@ -1,0 +1,4 @@
+interface:
+  display_name: "Android Agent Lab Projects"
+  short_description: "Open local Android projects in the app library"
+  default_prompt: "Use $android-agent-lab-projects to add this project to Android Agent Lab."

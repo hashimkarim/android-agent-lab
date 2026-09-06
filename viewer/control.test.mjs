@@ -83,3 +83,17 @@ test('disconnect queued during acquisition clears the final cursor and operation
   assert.equal(f.events.at(-1).events[0].phase,'leave');
   assert.equal(f.locks.at(-1)[0],'release');
 });
+
+test('congested movement coalesces without losing press/release or final position',async()=>{
+  const f=fixture(),client={};let acquired;
+  f.control.broker.acquire=()=>new Promise(r=>{acquired=r;});
+  const down=f.control.submit(client,f.point('down'));
+  await new Promise(r=>setImmediate(r));
+  const moves=Array.from({length:100},(_,i)=>f.control.submit(client,f.point('move',100+i,200+i)));
+  const up=f.control.submit(client,f.point('up',200,300));
+  assert.ok(f.control.queued<=3);
+  acquired();await Promise.all([down,...moves,up]);
+  assert.deepEqual(f.calls.map(c=>c.value.action),[0,2,1]);
+  assert.equal(f.calls[1].value.pointerX,199);
+  assert.equal(f.control.active,null);
+});

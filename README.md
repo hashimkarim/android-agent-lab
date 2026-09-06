@@ -1,29 +1,74 @@
 # Android Agent Lab
 
-An **Android 16 / API 36.1** emulator you can use in a browser preview while Codex, Claude Code,
-or a T3 Code thread works through ADB. Reuses
-[budtmo/docker-android](https://github.com/budtmo/docker-android) for the emulator,
-desktop input, and noVNC, plus official [scrcpy](https://github.com/Genymobile/scrcpy)
-and [Tango](https://tangoadb.dev/scrcpy/) for direct Android video in the browser.
-This repository supplies Compose configuration, the local browser bridge, and
-a portable skill for coordinating agent access to emulators and live phones.
+A Linux workspace where you and your coding agents build, install and test apps on the same Android phones and emulators.
 
-A small derived Dockerfile adds Google's stable Android 16 system image and
-one version mapping and a Pixel data-persistence fix to the upstream launcher. Emulator execution, streaming,
-and input handling are supplied by existing upstream components.
+<p>
+  <a href="https://github.com/Hashim-K/android-agent-lab/releases/latest"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/Hashim-K/android-agent-lab/release.svg?logo=github&amp;variant=outline&amp;mode=dark"><img alt="Latest GitHub release" src="https://shieldcn.dev/github/Hashim-K/android-agent-lab/release.svg?logo=github&amp;variant=outline&amp;mode=light"></picture></a>
+  <a href="https://aur.archlinux.org/packages/android-agent-lab-bin"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/badge/AUR-package-1793D1.svg?logo=archlinux&amp;variant=outline&amp;mode=dark"><img alt="AUR: android-agent-lab-bin" src="https://shieldcn.dev/badge/AUR-package-1793D1.svg?logo=archlinux&amp;variant=outline&amp;mode=light"></picture></a>
+  <a href="https://github.com/Hashim-K/homebrew-tap/blob/main/Formula/android-agent-lab.rb"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/badge/Homebrew-tap-FBB040.svg?logo=homebrew&amp;variant=outline&amp;mode=dark"><img alt="Homebrew: hashim-k/tap/android-agent-lab" src="https://shieldcn.dev/badge/Homebrew-tap-FBB040.svg?logo=homebrew&amp;variant=outline&amp;mode=light"></picture></a>
+  <a href="https://copr.fedorainfracloud.org/coprs/hashimkarim/android-agent-lab/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/badge/Fedora-COPR-51A2DA.svg?logo=fedora&amp;variant=outline&amp;mode=dark"><img alt="Fedora COPR: hashimkarim/android-agent-lab" src="https://shieldcn.dev/badge/Fedora-COPR-51A2DA.svg?logo=fedora&amp;variant=outline&amp;mode=light"></picture></a>
+  <a href="https://launchpad.net/~hashimkarim/+archive/ubuntu/android-agent-lab"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/badge/Ubuntu-PPA-E95420.svg?logo=ubuntu&amp;variant=outline&amp;mode=dark"><img alt="Ubuntu PPA: hashimkarim/android-agent-lab" src="https://shieldcn.dev/badge/Ubuntu-PPA-E95420.svg?logo=ubuntu&amp;variant=outline&amp;mode=light"></picture></a>
+</p>
 
-## Linux desktop app
+<img src="docs/images/workspace.png" alt="Android Agent Lab workspace with a phone and two independently managed emulators" width="720">
 
-[Download Android Agent Lab](https://github.com/Hashim-K/android-agent-lab/releases)
-as an **AppImage, DEB, RPM, Arch package, or portable tar archive**. The desktop
-launcher discovers devices, starts the Android 16 emulator, and opens the same
-scrcpy viewer used by browser previews. Share a session's private browser URL or
-agent instructions to work together with named cursors on one Android screen.
-See [installation, requirements, and building](docs/desktop.md).
-Package manager channels are available through the
-[AUR, Homebrew tap, Fedora COPR, and Ubuntu PPA](docs/distribution.md).
+*The device workspace, shown with demonstration devices.*
 
-## Start from source
+- **One shared Android screen.** Interact in the desktop app or a browser preview while Codex, Claude Code or T3 uses coordinated ADB access. Named agent cursors are optional.
+- **Phones and Android 16 emulators.** Discover USB devices, pair over Wi-Fi, and create, rename, start, stop or delete separate emulator instances.
+- **Projects and APKs in one library.** Open a project with `android-agent-lab .`, discover its build settings and installed toolchains, then build, install, launch or collect logs. Copy job output or clear finished jobs.
+- **Reserve devices for your work.** Shared claims and handoffs coordinate agent threads; **Lock for me** keeps a device reserved across app restarts.
+- **Direct scrcpy video.** H.264 decoding, continuous touch gestures and developer toolbars outside the phone screen. **No cursors** preserves your system pointer and turns off overlay work.
+
+## Install
+
+Use your distribution's package channel for updates, or download a portable
+AppImage. All channels below are published community packages maintained by this
+project. The desktop app needs **glibc Linux, X11 or Wayland, Python 3.10+ and ADB**;
+native packages install their declared dependencies. Docker is optional for phones.
+
+| System / channel | CPU | Recommended installation |
+| --- | --- | --- |
+| Arch Linux / compatible Arch Linux ARM | x86_64, aarch64 | [AUR](docs/distribution.md#arch-linux-and-derivatives): `yay -S android-agent-lab-bin`, or the helper-free instructions |
+| Fedora 43 / 44 | x86_64, aarch64 | [Enable COPR, then install](docs/distribution.md#fedora-43-and-44) with `dnf` |
+| Ubuntu 24.04 LTS (Noble) | amd64 | [Add the PPA, then install](docs/distribution.md#ubuntu-2404-lts-amd64) with `apt` |
+| Homebrew on Linux | x86_64, ARM64 | [Homebrew prerequisites](docs/distribution.md#homebrew-on-linux), then `brew install hashim-k/tap/android-agent-lab` |
+| Direct downloads for glibc Linux | x86_64, ARM64 | [AppImage, DEB, RPM, Arch and tar archives](https://github.com/Hashim-K/android-agent-lab/releases/latest); [verify and install](docs/desktop.md#choose-a-package) |
+
+The PPA is specific to Ubuntu Noble; ARM64 users can use the direct DEB. Direct
+packages on other distributions must meet the [runtime requirements](docs/desktop.md#choose-a-package).
+Local Docker emulators additionally need **x86_64, Docker Compose, `/dev/kvm`,
+about 25 GB of disk space and up to 6 GB RAM per running instance**. ARM64 desktops
+can use physical devices and remote ADB hosts.
+
+See [install, upgrade and uninstall instructions](docs/distribution.md),
+[portable installation](docs/desktop.md#appimage-and-application-menu-installation),
+or [build the desktop app from source](docs/desktop.md#build-and-verify).
+
+## First run
+
+```bash
+android-agent-lab --version
+android-agent-lab
+```
+
+The first command prints the installed version; the second opens the workspace.
+Connect a USB phone with USB debugging enabled and accept its authorization
+prompt, or choose **Add phone** for wireless pairing. Choose **Open device**, then
+**Copy browser URL** to use that same screen in a Chromium browser or preview pane.
+
+In the app, **Install agent skills** adds the live-device and project skills for
+Codex, Claude and T3. **Copy agent instructions** provides the session details for
+your thread. Keep that URL and those instructions private: they include access
+to the shared session.
+
+From a Gradle project's root, run `android-agent-lab .` to add or reopen it in
+**Projects & APKs**. Opening a project preserves its saved settings and does not
+run a build. See the [terminal guide](docs/desktop.md#open-a-project-from-the-terminal),
+[workspace guide](docs/desktop.md#phones-multiple-emulators-and-locks),
+[viewer and latency guide](docs/streaming.md), and [troubleshooting](docs/troubleshooting.md).
+
+## Start the Docker emulator from source
 
 Requires a **Linux x86_64 host with working `/dev/kvm`**, Docker Engine with Compose,
 Python 3.10+, and Android SDK platform-tools (`adb`). Allow about 25 GB for the
@@ -73,7 +118,7 @@ accepts a physical phone's serial and needs no Docker for that case.
 
 **Agent cursors** show where coordinated agent taps and drags happen, with
 separate names and colors in every browser view. Typing and navigation appear
-as activity labels. Choose **Agents only** or **Agents and user**; the user
+as activity labels. Choose **No cursors**, **Agents only**, or **Agents and user**; the user
 pointer is a small circle that follows hovering continuously. See
 [cursor attribution](docs/streaming.md#agent-cursors) for shared-session labels.
 
@@ -195,6 +240,13 @@ Upstream behavior analytics is disabled with `USER_BEHAVIOR_ANALYTICS=false`.
 See [troubleshooting](docs/troubleshooting.md) for boot logs and graphics options.
 
 ## Why this repository exists
+
+The desktop and browser viewer reuse official [scrcpy](https://github.com/Genymobile/scrcpy)
+and [Tango](https://tangoadb.dev/scrcpy/). The Docker adapter reuses
+[budtmo/docker-android](https://github.com/budtmo/docker-android) for emulator
+execution, desktop input and noVNC. A small derived Dockerfile adds Google's
+Android 16 / API 36.1 image, a version mapping and a Pixel data-persistence fix
+to the upstream launcher.
 
 | Project | Fit |
 | --- | --- |

@@ -56,6 +56,10 @@ jobs:
           sudo apt-get install -y ./desktop/dist/*.deb
           desktop-file-validate /usr/share/applications/android-agent-lab.desktop
           env -u ELECTRON_RUN_AS_NODE ADB_LAB_USER_DATA="$RUNNER_TEMP/lab-smoke" xvfb-run -a /opt/Android\ Agent\ Lab/android-agent-lab --smoke-test
+      - name: Test installed workspace UI and background jobs
+        env:
+          ADB_LAB_TEST_EXECUTABLE: /opt/Android Agent Lab/android-agent-lab
+        run: env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:ui --prefix desktop
       - name: Inspect package metadata and content
         run: |
           rpm -qip desktop/dist/*.rpm

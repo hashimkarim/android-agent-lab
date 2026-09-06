@@ -107,6 +107,20 @@ def public_record(record):
             "expired": record["expires_at"] <= time.time()}
 
 
+def reserve(serial, token, enabled):
+    """Rotate access when the human locks/unlocks a device. Reservations survive restarts."""
+    with locked(serial) as path:
+        record = read_record(path)
+        check_owner(record, token, allow_expired=True)
+        record['reserved'] = bool(enabled)
+        record['token'] = secrets.token_urlsafe(24)
+        # Older installed helpers also respect this non-expiring claim. The token
+        # is private to the desktop; it is never copied into agent instructions.
+        record['expires_at'] = 2**40 if enabled else time.time() + record['ttl']
+        save_record(path, record)
+        return record
+
+
 def validate_ttl(ttl):
     if not math.isfinite(ttl) or not 1 <= ttl <= 86400:
         raise CoordinationError("TTL must be between 1 and 86400 seconds.")
@@ -130,12 +144,16 @@ def change_claim(serial, token, action, owner=None, note=None, ttl=None):
         record = read_record(path)
         check_owner(record, token, allow_expired=action in {"release", "renew"})
         if action == "release":
+            if record.get('reserved'):
+                raise CoordinationError('Device is locked for its human owner. Unlock it in Android Agent Lab first.')
             path.unlink()
             return {"released": serial}
         if ttl is not None:
             validate_ttl(ttl)
             record["ttl"] = ttl
         if action == "handoff":
+            if record.get('reserved'):
+                raise CoordinationError('Unlock this device before inviting another owner.')
             if not owner:
                 raise CoordinationError("Handoff requires the next thread's owner label.")
             record["previous_owner"] = record["owner"]
@@ -143,7 +161,7 @@ def change_claim(serial, token, action, owner=None, note=None, ttl=None):
             record["token"] = secrets.token_urlsafe(24)
         if note is not None:
             record["note"] = note
-        record["expires_at"] = time.time() + record["ttl"]
+        record["expires_at"] = 2**40 if record.get('reserved') else time.time() + record["ttl"]
         save_record(path, record)
         return record
 
@@ -237,7 +255,7 @@ def run_adb(serial, token, args, timeout=120, *, capture=False, renew=True, acto
         if activity:
             activity.update(id=secrets.token_hex(8), actor=actor)
         if renew:
-            record["expires_at"] = time.time() + record["ttl"]
+            record["expires_at"] = 2**40 if record.get('reserved') else time.time() + record["ttl"]
             save_record(path, record)
         if activity:
             publish_activity(path, record, {**activity, "phase": "start"})
@@ -252,7 +270,7 @@ def run_adb(serial, token, args, timeout=120, *, capture=False, renew=True, acto
             if activity:
                 publish_activity(path, record, {**activity, "phase": "complete", "ok": succeeded})
             if renew:
-                record["expires_at"] = time.time() + record["ttl"]
+                record["expires_at"] = 2**40 if record.get('reserved') else time.time() + record["ttl"]
                 save_record(path, record)
 
 

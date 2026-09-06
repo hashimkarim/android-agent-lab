@@ -52,9 +52,23 @@ export class LiveControl {
   }
   submit(owner, data) {
     if (data?.kind === 'hover') { try { this.hover(owner, data); return Promise.resolve(); } catch (e) { return Promise.reject(e); } }
+    // Keep down/up/cancel and other actors ordered, but don't replay obsolete
+    // positions after a slow socket or lock acquisition. Merge only adjacent
+    // pending moves from the same gesture owner.
+    if (data?.kind==='pointer' && data.phase==='move' && this.lastQueued?.owner===owner &&
+        !this.lastQueued.started && this.lastQueued.data.kind==='pointer' &&
+        this.lastQueued.data.phase==='move' && this.lastQueued.data.actor===data.actor) {
+      this.lastQueued.data=data;
+      return this.lastQueued.result;
+    }
     if (this.queued >= 64) return Promise.reject(new Error('Input is congested. Release the pointer and retry.'));
     this.queued++;
-    const result = this.tail.then(() => this.handle(owner, data));
+    const entry={owner,data,started:false};
+    const result = this.tail.then(() => {
+      entry.started=true;if(this.lastQueued===entry)this.lastQueued=null;
+      return this.handle(owner, entry.data);
+    });
+    entry.result=result;this.lastQueued=entry;
     this.tail = result.catch(() => {}).finally(() => this.queued--);
     return result;
   }

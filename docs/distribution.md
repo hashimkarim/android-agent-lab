@@ -16,26 +16,41 @@ yay -S android-agent-lab-bin
 # Or: paru -S android-agent-lab-bin
 ```
 
-Without a helper, clone `https://aur.archlinux.org/android-agent-lab-bin.git`,
-review the recipe, and run `makepkg -si` as a normal user. The recipe also supports
-compatible Arch Linux ARM installations. Upgrade with your AUR helper.
+The `-bin` recipe packages the published release binaries. For a helper-free
+installation, follow the [ArchWiki prerequisites and review guidance](https://wiki.archlinux.org/title/Arch_User_Repository):
+
+```bash
+sudo pacman -Syu --needed base-devel git
+git clone https://aur.archlinux.org/android-agent-lab-bin.git
+cd android-agent-lab-bin
+# Review PKGBUILD and accompanying build/install files before building.
+makepkg -si
+```
+
+Run `makepkg` as your regular user. The recipe supports x86_64 Arch Linux and
+compatible aarch64 Arch Linux ARM installations.
 
 ## Fedora 43 and 44
 
 Enable the [Android Agent Lab COPR](https://copr.fedorainfracloud.org/coprs/hashimkarim/android-agent-lab/):
 
 ```bash
+sudo dnf install dnf5-plugins
 sudo dnf copr enable hashimkarim/android-agent-lab
 sudo dnf install android-agent-lab
 ```
 
-Both x86_64 and aarch64 builds are provided. Subsequent updates use `dnf upgrade`.
+Both x86_64 and aarch64 builds are provided.
+[`dnf5-plugins`](https://packages.fedoraproject.org/pkgs/dnf5/dnf5-plugins/) supplies
+the `copr` command on these Fedora releases.
 
 ## Ubuntu 24.04 LTS (amd64)
 
 Install from the [Android Agent Lab PPA](https://launchpad.net/~hashimkarim/+archive/ubuntu/android-agent-lab):
 
 ```bash
+sudo apt update
+sudo apt install software-properties-common
 sudo add-apt-repository ppa:hashimkarim/android-agent-lab
 sudo apt update
 sudo apt install android-agent-lab
@@ -49,12 +64,19 @@ Debian or to a different Ubuntu series.
 
 ## Homebrew on Linux
 
-Install from [Hashim-K's tap](https://github.com/Hashim-K/homebrew-tap):
+Follow [Homebrew's installation prerequisites](https://docs.brew.sh/Installation)
+and its shell setup first. Then install the fully qualified formula from
+[Hashim-K's tap](https://github.com/Hashim-K/homebrew-tap/blob/main/Formula/android-agent-lab.rb):
 
 ```bash
 brew install hashim-k/tap/android-agent-lab
 android-agent-lab
 ```
+
+Current Homebrew [trusts the named formula](https://docs.brew.sh/Tap-Trust) when
+you use its fully qualified install command. If your version asks for trust,
+review and approve `hashim-k/tap/android-agent-lab` specifically. You can also use
+`brew trust --formula hashim-k/tap/android-agent-lab`; whole-tap trust is unnecessary.
 
 This formula supports x86_64 and ARM64 Linux desktops. Homebrew installs Python;
 install ADB and the normal GTK 3, NSS, GBM, and ALSA desktop libraries through your
@@ -69,8 +91,7 @@ export XDG_DATA_DIRS="$(brew --prefix)/share:${XDG_DATA_DIRS:-/usr/local/share:/
 ```
 
 Ubuntu systems that restrict unprivileged user namespaces should use the PPA or
-DEB, which installs the app's AppArmor profile. Upgrade the formula with
-`brew update && brew upgrade android-agent-lab`.
+DEB, which installs the app's AppArmor profile.
 
 ## AppImage, RPM, DEB and portable downloads
 
@@ -78,6 +99,54 @@ All ten architecture-specific installers remain available from
 [GitHub Releases](https://github.com/Hashim-K/android-agent-lab/releases), with
 `SHA256SUMS` and the user-local AppImage installer. See the
 [desktop guide](desktop.md) for dependencies and installation details.
+
+## First run
+
+```bash
+android-agent-lab --version
+android-agent-lab
+```
+
+The first command prints the installed version; the second opens the device
+workspace. Plug in a USB device with debugging enabled and accept its authorization
+prompt, or use **Add phone**. **Open device** starts the shared viewer. From a
+Gradle project's directory, `android-agent-lab .` adds or reopens it in the library.
+See the [workspace guide](desktop.md#use-the-shared-screen) for pairing and agent access.
+
+## Upgrade and uninstall
+
+Quit the launcher before updating, then reopen it to use the new version.
+Use **Stop** on each emulator you want to turn off; quitting the launcher stops
+its video sessions but leaves emulators and their Android data in place.
+
+| Channel | Upgrade | Remove the app |
+| --- | --- | --- |
+| AUR | `yay -Syu android-agent-lab-bin`, or update and review the cloned recipe with `git pull --ff-only`, then `makepkg -si` | `sudo pacman -R android-agent-lab-bin` |
+| Homebrew | `brew update`, then `brew upgrade hashim-k/tap/android-agent-lab` | `brew uninstall hashim-k/tap/android-agent-lab` |
+| COPR | `sudo dnf upgrade android-agent-lab` | `sudo dnf remove android-agent-lab` |
+| PPA | `sudo apt update`, then `sudo apt install --only-upgrade android-agent-lab` | `sudo apt remove android-agent-lab` |
+| Direct DEB / RPM / Arch package | Verify the new download and repeat its installation command | `sudo apt remove android-agent-lab`, `sudo dnf remove android-agent-lab`, or `sudo pacman -R android-agent-lab` respectively |
+| AppImage / tar archive | [Replace the verified image or extracted runtime](desktop.md#upgrade-and-remove-portable-installs) | [Remove its launcher and runtime](desktop.md#upgrade-and-remove-portable-installs) |
+
+App removal preserves your projects, saved APKs, device names, claims and emulator
+data. See [local data locations](desktop.md#local-files-and-remote-hosts). Do not
+delete your workspace or Docker volumes as part of a routine uninstall.
+
+Removing a package does not remove its repository. If you no longer use any
+packages from a channel, you can also remove its configuration:
+
+```bash
+# Homebrew: only after removing every formula you use from this shared tap.
+brew untap hashim-k/tap
+# Fedora: remove this COPR repository configuration.
+sudo dnf copr remove hashimkarim/android-agent-lab
+# Ubuntu: remove this PPA and refresh package lists.
+sudo add-apt-repository --remove ppa:hashimkarim/android-agent-lab
+sudo apt update
+```
+
+Run only the commands for the channel you installed. AUR recipes do not add a
+pacman repository; the cloned recipe directory can be removed separately.
 
 ## Maintaining the channels
 

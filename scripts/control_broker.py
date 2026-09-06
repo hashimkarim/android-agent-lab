@@ -44,8 +44,8 @@ class Broker:
         try:
             record = coord.read_record(path)
             coord.check_owner(record, self.config['token'])
-            record['expires_at'] = time.time() + record['ttl']
-            coord.save_record(path, record)
+            record['expires_at'] = 2**40 if record.get('reserved') else time.time() + record['ttl']
+            coord.save_record(path, record, durable=False)
             coord.publish_activity(path, record, {**event, 'phase':'start'})
         except BaseException:
             lock.__exit__(*sys.exc_info())
@@ -63,8 +63,8 @@ class Broker:
             # Preserve the original attribution, including when the client disconnects.
             final.update(id=self.event['id'], actor=self.event['actor'])
             coord.publish_activity(self.path, record, {**final, 'phase':'complete', 'ok':bool(ok)})
-            record['expires_at'] = time.time() + record['ttl']
-            coord.save_record(self.path, record)
+            record['expires_at'] = 2**40 if record.get('reserved') else time.time() + record['ttl']
+            coord.save_record(self.path, record, durable=False)
         finally:
             self.lock.__exit__(None, None, None)
             self.lock = None

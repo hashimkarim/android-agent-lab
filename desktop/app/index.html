@@ -1,29 +1,63 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
-  <title>Android Agent Lab</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="renderer.js" defer></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <title>Android Agent Lab</title><link rel="stylesheet" href="style.css"><script src="renderer.js" defer></script>
 </head>
 <body>
-  <header><div class="brand"><img src="icon.png" alt="" width="48" height="48"><div><h1>Android Agent Lab</h1><p>One device. Your app, your agents, your browser.</p></div></div><button id="docs" class="quiet">Help ↗</button></header>
-  <main>
-    <div class="lead"><div><span class="eyebrow">WORKSPACE</span><h2>Your Android devices</h2><p>Open a phone or emulator, then invite an agent into the same screen.</p></div><button id="refresh">↻ Refresh</button></div>
-    <div id="notice" role="status" aria-live="polite" hidden></div>
-    <div id="requirements">Checking Python and ADB…</div>
-    <section aria-label="Devices"><div id="devices" class="devices"><p class="empty">Looking for connected devices…</p></div></section>
+<header><div class="brand"><img src="icon.png" alt="" width="44" height="44"><div><h1>Android Agent Lab</h1><p>Your devices. A shared space to build and test.</p></div></div><button id="docs" class="quiet">Help ↗</button></header>
+<main>
+  <nav class="tabs" aria-label="Workspace"><button data-page="devices" aria-current="page">Devices</button><button data-page="library">Projects &amp; APKs</button><button data-page="jobs">Jobs <span id="job-count"></span></button></nav>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <section id="page-devices">
+    <div class="lead"><div><span class="eyebrow">WORKSPACE</span><h2>Your Android devices</h2><p>Connect a phone, or give each task its own emulator.</p></div><div class="button-row"><button id="add-phone" class="quiet">＋ Add phone</button><button id="new-emulator">＋ Emulator</button></div></div>
+    <div class="status-line"><span id="requirements">Checking ADB…</span><button id="refresh" class="quiet small">↻ Refresh</button></div>
+    <div class="section-heading"><h2>Phones &amp; connected devices</h2><span class="muted">USB detection updates automatically</span></div>
+    <div id="devices" class="devices"></div>
+    <div class="section-heading"><h2>Emulators</h2><span class="muted">Android 16 · separate apps and data</span></div>
+    <div id="emulators" class="devices"></div>
     <section id="sessions-section" hidden><div class="section-heading"><h2>Shared sessions</h2><span class="muted">Desktop + browser + agents</span></div><div id="sessions"></div></section>
-    <div class="setup-grid">
-      <section class="panel"><span class="eyebrow">START FRESH</span><h2>Android 16 emulator</h2><p>A persistent Pixel 9 with API 36.1. Runs locally in Docker with KVM acceleration.</p><button id="emulator">Start emulator</button><p class="fine" id="emulator-help">Requires Docker Compose, Linux x86_64, and /dev/kvm. First setup downloads several GB.</p></section>
-      <section class="panel"><span class="eyebrow">KEEP WORKING TOGETHER</span><h2>Connect your agents</h2><p>Add live device coordination to Codex, Claude Code, and T3’s provider. Open a device, then copy its agent instructions.</p><button id="skill" class="quiet">Install coordination skill</button><p class="fine">Existing skill installations are preserved.</p></section>
-    </div>
-    <section class="panel join"><div><h2>Already have a viewer?</h2><p>Paste its private localhost URL to open the same screen in a desktop window.</p></div><form id="join-form"><label class="sr-only" for="join-url">Private viewer URL</label><input id="join-url" type="password" placeholder="http://127.0.0.1:8766/#key=…" autocomplete="off" required><button>Open viewer</button></form></section>
-    <details><summary>Connection options &amp; startup log</summary><div class="options"><label>Browser port <input id="port" type="number" min="0" max="65535" value="0"></label><p class="fine">0 picks an available port. Copy the session’s URL into your preview pane.</p></div><pre id="log">No emulator startup in progress.</pre></details>
-  </main>
-  <footer><span id="version">Android Agent Lab</span><span>Local video · Named agent cursors · Shared ADB claims</span></footer>
-  <dialog id="claim-dialog"><form id="claim-form"><h2>Join the current owner</h2><p id="claim-description"></p><label>Claim token<input id="claim-token" type="password" autocomplete="off" required></label><p class="fine">Get the token from the owning thread. The desktop will leave this claim intact when it closes.</p><div class="dialog-actions"><button id="cancel-claim" type="button" class="quiet">Cancel</button><button>Open shared device</button></div></form></dialog>
-</body>
-</html>
+    <details class="panel settings-panel"><summary>Viewing &amp; agent settings</summary>
+      <div class="options"><label>Streaming preset<select id="profile"><option value="fast">Fast · 960 px / 60 fps</option><option value="balanced">Balanced · 1280 px / 60 fps</option><option value="detail">Detail · 1920 px / 60 fps</option></select></label><label>Browser port<input id="port" type="number" min="0" max="65535" value="0"></label></div>
+      <p class="fine">Applies to new sessions. Port 0 chooses a free port for each device. Fast reduces video encoding and decoding work.</p>
+      <button id="skill" class="quiet">Install agent skills</button><p class="fine">Add project-opening and device-coordination skills for Codex, Claude Code and T3. Existing installations are preserved.</p>
+      <form id="join-form"><label class="sr-only" for="join-url">Private viewer URL</label><input id="join-url" type="password" placeholder="http://127.0.0.1:8766/#key=…" autocomplete="off" required><button>Open existing viewer</button></form>
+    </details>
+  </section>
+  <section id="page-library" hidden>
+    <div class="lead"><div><span class="eyebrow">BUILD &amp; DEPLOY</span><h2>Your app library</h2><p>Keep project settings and APKs ready for the next test.</p></div><div class="button-row"><button id="import-apk" class="quiet">＋ Save APK</button><button id="add-project">＋ Project</button></div></div>
+    <p class="fine command-hint">Open a project from your terminal: <code>android-agent-lab .</code></p>
+    <div class="target-bar"><label for="target">Target device</label><select id="target"><option value="">Select a connected device…</option></select><span class="fine">Each install uses the device’s coordinated claim.</span></div>
+    <div class="section-heading"><h2>Projects</h2><span class="muted">Gradle builds · saved output paths</span></div><div id="projects" class="library-list"></div>
+    <div class="section-heading"><h2>Saved APKs</h2><span class="muted">A private copy is kept in this workspace</span></div><div id="apks" class="library-list"></div>
+  </section>
+  <section id="page-jobs" hidden><div class="lead"><div><span class="eyebrow">ACTIVITY</span><h2>Builds &amp; device jobs</h2><p>Follow output, copy messages and clear finished jobs.</p></div><button id="clear-jobs" class="quiet">Clear finished</button></div><div id="jobs"></div></section>
+</main>
+<footer><span id="version">Android Agent Lab</span><span>Local video · Shared devices · Your workspace</span></footer>
+<dialog id="phone-dialog" class="wide-dialog"><div class="dialog-heading"><h2>Add a phone</h2><button data-close="phone-dialog" class="quiet" aria-label="Close">×</button></div>
+  <div class="tabs"><button data-connect="qr" aria-current="page">Scan QR</button><button data-connect="code">Pairing code</button><button data-connect="usb">USB</button></div>
+  <section id="connect-qr"><div class="qr-layout"><div class="qr-box"><img id="qr-image" width="260" height="260" alt="Wireless debugging pairing QR code"></div><div><h3>Scan from your phone</h3><p>Open <strong>Developer options → Wireless debugging → Pair device with QR code</strong>.</p><p class="fine">Use Android 11 or newer on the same Wi-Fi network. Scan from Wireless debugging, not the normal camera app.</p><p id="qr-status" role="status">Preparing QR code…</p><button id="qr-new" class="quiet">New QR code</button></div></div></section>
+  <section id="connect-code" hidden><p>Open <strong>Wireless debugging → Pair device with pairing code</strong> on your phone.</p><button id="scan" class="quiet">↻ Find nearby phones</button><div id="nearby"></div>
+    <label id="network-label" hidden>Use this laptop’s network prefix<select id="phone-network"></select></label><p class="fine" id="network-hint">Enter the address shown on your device. You can also paste a complete IP:port.</p>
+    <form id="pair-form"><div class="address-fields"><label>IP address<input id="pair-ip" placeholder="192.168.1.20" required autocomplete="off" spellcheck="false"></label><label>Pairing port<input id="pair-port" type="number" min="1" max="65535" inputmode="numeric" placeholder="37123" required></label><label>Six-digit code<input id="pair-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="off"></label></div><button>Pair phone</button></form>
+    <details id="manual-connect"><summary>Already paired, but not connected?</summary><p class="fine">Use the connection port on the main Wireless debugging screen. It is different from the pairing port and can change when wireless debugging restarts.</p><form id="connect-form"><div class="address-fields"><label>IP address<input id="connect-ip" placeholder="192.168.1.20" required autocomplete="off" spellcheck="false"></label><label>Connection port<input id="connect-port" type="number" min="1" max="65535" inputmode="numeric" placeholder="40111" required></label></div><button>Connect</button></form></details>
+  </section>
+  <section id="connect-usb" hidden><h3>Connect with a data cable</h3><ol><li>Enable <strong>Developer options → USB debugging</strong> on the phone.</li><li>Plug the phone into this computer with a USB data cable.</li><li>Unlock the phone and accept <strong>Allow USB debugging</strong>.</li></ol><p>It will appear in Devices automatically. If it shows “unauthorized”, approve the prompt on the phone. On Linux, a “no permissions” message usually needs your distribution’s Android USB rules.</p><button id="usb-refresh">Find USB devices</button><p id="usb-status" role="status"></p></section>
+  <p id="phone-status" role="status" class="dialog-status"></p>
+</dialog>
+<dialog id="name-dialog"><form id="name-form"><h2 id="name-title">Rename</h2><label>Name<input id="name-value" maxlength="80" required></label><div class="dialog-actions"><button type="button" data-close="name-dialog" class="quiet">Cancel</button><button>Save</button></div></form></dialog>
+<dialog id="project-dialog" class="wide-dialog"><form id="project-form">
+  <h2 id="project-title">Save a project</h2>
+  <label>Project root<div class="path-input"><input id="project-path" placeholder="/home/you/projects/my-app" required><button id="browse-project" type="button" class="quiet">Browse…</button></div></label>
+  <div class="button-row"><button id="detect-project" type="button" class="quiet small">Detect settings</button><span class="fine">Leave overrides blank to follow the repository automatically.</span></div>
+  <p id="project-detected" class="fine detected-settings" role="status"></p>
+  <label>Name<input id="project-name" maxlength="80" placeholder="From repository name"></label>
+  <div class="options"><label>Gradle task override<input id="project-task" list="project-tasks" placeholder="Automatic · assembleDebug"><datalist id="project-tasks"></datalist></label><label>Application ID override<input id="project-package" placeholder="Automatic · from Gradle or APK metadata"></label></div>
+  <label>APK output path override<input id="project-apk" placeholder="Automatic · match build variant and device CPU"></label>
+  <details id="project-toolchain"><summary>Java &amp; Android SDK overrides</summary><label>JDK directory<input id="project-javaHome" placeholder="Automatic · compatible installed JDK"></label><label>Android SDK directory<input id="project-sdkHome" placeholder="Automatic · local.properties or installed SDK"></label></details>
+  <p class="fine">APK paths are relative to the project. Computed build settings and custom flavors may need an override until their APK metadata is available. Detection reads files; Build runs the Gradle wrapper.</p>
+  <p id="project-status" class="dialog-status" role="status"></p><div class="dialog-actions"><button type="button" data-close="project-dialog" class="quiet">Cancel</button><button>Save project</button></div>
+</form></dialog>
+<dialog id="claim-dialog"><form id="claim-form"><h2>Join the current owner</h2><p id="claim-description"></p><label>Claim token<input id="claim-token" type="password" autocomplete="off" required></label><p class="fine">Get the token from the owning thread. Closing this session keeps the owner’s claim.</p><div class="dialog-actions"><button data-close="claim-dialog" type="button" class="quiet">Cancel</button><button>Open shared device</button></div></form></dialog>
+</body></html>

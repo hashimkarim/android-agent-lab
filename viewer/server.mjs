@@ -15,8 +15,10 @@ import {join} from 'node:path';
 import {LockBroker} from './broker.mjs';
 import {LiveControl} from './control.mjs';
 import {ViewerOptions} from './options.mjs';
+import {desktopLibrary} from './library.mjs';
 
 const config = JSON.parse(process.env.ADB_VIDEO_CONFIG);
+const library = desktopLibrary(config);
 const root = new URL('../', import.meta.url);
 let client, controls, video, ending = false;
 function owns() {
@@ -92,7 +94,19 @@ const server = createServer(async (req, res) => {
   }
   if (!keyMatches(req.headers['x-adb-preview-key'])) return reply(res, 403, {error:'Open the complete private viewer URL'});
   if (!owns()) return reply(res, 409, {error:'Device claim expired or changed'});
-  if (req.method === 'GET' && req.url === '/status') return reply(res, 200, {serial:config.serial, control:config.control, width:config.width, height:config.height, maxFps:config.maxFps, controlTransport:'scrcpy'});
+  if (req.method === 'GET' && req.url === '/status') return reply(res, 200, {serial:config.serial, control:config.control, width:config.width, height:config.height, maxFps:config.maxFps, profile:config.profile, controlTransport:'scrcpy'});
+  if (req.url==='/library' || req.url==='/library/install' || req.url?.startsWith('/library/job/')) {
+    if(!config.control) return reply(res,403,{error:'This viewer is read-only'});
+    try {
+      if(req.method==='GET' && req.url==='/library') return reply(res,200,await library.call({action:'catalog'}));
+      if(req.method==='GET' && /^\/library\/job\/[a-zA-Z0-9-]+$/.test(req.url)) return reply(res,200,await library.call({action:'job',id:req.url.split('/').at(-1)}));
+      if(req.method==='POST' && req.url==='/library/install' && req.headers['content-type']==='application/json') {
+        const {kind,id,output}=await jsonBody(req,4096);
+        return reply(res,200,await library.call({action:'install',kind,id,output}));
+      }
+      return reply(res,404,{error:'Unknown library route'});
+    } catch(error) {return reply(res,409,{error:error.message});}
+  }
   if (req.method !== 'POST' || !['/input','/devtools','/devtools/install'].includes(req.url)) return reply(res, 404, {error:'Unknown route'});
   if (!config.control) return reply(res, 403, {error:'This viewer is read-only'});
   if (req.url === '/input') {
@@ -198,8 +212,8 @@ try {
   const jar = readFileSync(config.serverFile);
   await AdbScrcpyClient.pushServer(adb, new ReadableStream({start(c) {c.enqueue(jar);c.close();}}), remote);
   client = await AdbScrcpyClient.start(adb, remote, new ViewerOptions({audio:false, control:config.control, clipboardAutosync:false,
-    maxSize:config.maxSize, maxFps:config.maxFps, videoBitRate:4_000_000,
-    videoCodecOptions:'i-frame-interval=1', tunnelForward:true}));
+    maxSize:config.maxSize, maxFps:config.maxFps, videoBitRate:config.bitRate || 4_000_000,
+    videoCodecOptions:'i-frame-interval:float=0.25', tunnelForward:true}));
   client.output.pipeTo(new WritableStream({write(line) {process.stderr.write(`[scrcpy] ${line}\n`);}})).catch(() => {});
   client.exited.then(() => stop()).catch(() => stop(1));
   video = await client.videoStream;

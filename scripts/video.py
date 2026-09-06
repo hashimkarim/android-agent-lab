@@ -23,6 +23,7 @@ from adb_preview import input_command
 SERVER_VERSION = '3.3.3'
 SERVER_SHA256 = '7e70323ba7f259649dd4acce97ac4fefbae8102b2c6d91e2e7be613fd5354be0'
 SERVER = Path(os.environ.get('ADB_VIDEO_SERVER', str(ROOT / '.lab' / f'scrcpy-server-v{SERVER_VERSION}')))
+PROFILES = {'fast': (960, 60, 3_000_000), 'balanced': (1280, 60, 6_000_000), 'detail': (1920, 60, 10_000_000)}
 
 
 def verify_server(path=SERVER):
@@ -98,25 +99,48 @@ def release_owned(serial, token):
             time.sleep(.25)
 
 
+def display_size(serial):
+    """Called under the operation lock; distinguish transport failure from video."""
+    command = [coord.adb_binary(), '-L', coord.server_id(), '-s', serial]
+    wireless = re.fullmatch(r'(?:\[[^\]]+\]|[\d.]+):\d+', serial)
+    hint = ('Wake the device and use its current IP and connection port from the main Wireless debugging screen. '
+            'Use Update connection in Devices if the address changed.' if wireless else
+            'Unlock the device, check its USB cable, and accept any debugging prompt.')
+    try:
+        state = subprocess.run([*command, 'get-state'], capture_output=True, text=True, timeout=3)
+        if state.returncode or state.stdout.strip() != 'device':
+            raise coord.CoordinationError(f'ADB cannot reach {serial}: {state.stderr.strip() or state.stdout.strip() or "not connected"}. {hint}')
+        result = subprocess.run([*command, 'shell', 'wm', 'size'], capture_output=True, text=True, timeout=10, check=True)
+    except subprocess.TimeoutExpired as error:
+        raise coord.CoordinationError(f'ADB did not receive a response from {serial} in time. {hint}') from error
+    except subprocess.CalledProcessError as error:
+        raise coord.CoordinationError(f'Android did not answer the display query on {serial}: {error.stderr.strip() or "connection closed"}. {hint}') from error
+    dimensions = re.findall(r'(?:Physical|Override) size:\s*(\d+)x(\d+)', result.stdout)
+    if not dimensions or any(int(d) <= 0 for d in dimensions[-1]):
+        raise coord.CoordinationError(f'Android returned no usable display size for {serial}. {hint}')
+    return tuple(map(int, dimensions[-1]))
+
+
 def start(args):
+    if getattr(args, 'profile', None):
+        args.max_size, args.max_fps, args.bit_rate = PROFILES[args.profile]
     verify_server()
     if not (ROOT / 'viewer/public/client.js').is_file():
         raise coord.CoordinationError('Run python3 scripts/video.py setup first')
     if not 1 <= args.duration <= 86400 or not 320 <= args.max_size <= 4096 or not 1 <= args.max_fps <= 120 or not 0 <= args.port <= 65535:
         raise ValueError('Invalid duration, size, FPS, or port')
+    if not 100_000 <= getattr(args, 'bit_rate', 4_000_000) <= 100_000_000:
+        raise ValueError('Bit rate must be between 100000 and 100000000 bits/s')
     child = None
     try:
         with coord.locked(args.serial) as path:
             record = coord.read_record(path)
             coord.check_owner(record, args.token)
-            size = subprocess.run([coord.adb_binary(), '-L', coord.server_id(), '-s', args.serial, 'shell', 'wm', 'size'], capture_output=True, text=True, timeout=10, check=True)
-            dimensions = re.findall(r'(?:Physical|Override) size:\s*(\d+)x(\d+)', size.stdout)
-            if not dimensions:
-                raise coord.CoordinationError('Cannot determine device display size')
-            width, height = map(int, dimensions[-1])
+            width, height = display_size(args.serial)
             config = dict(serial=args.serial, token=args.token, record=str(path), activity=str(path.with_suffix('.activity')), server=coord.server_id(),
                           endpoint=endpoint(coord.server_id()), key=secrets.token_urlsafe(32), port=args.port,
                           control=args.control, maxSize=args.max_size, maxFps=args.max_fps,
+                          bitRate=getattr(args, 'bit_rate', 4_000_000), profile=getattr(args, 'profile', None),
                           width=width, height=height, serverFile=str(SERVER), python=sys.executable, supervisor=os.getpid())
             command, env = node_launch(config)
             child = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, text=True)
@@ -165,6 +189,8 @@ def main():
     p.add_argument('--duration', type=int, default=1800)
     p.add_argument('--max-size', type=int, default=1280)
     p.add_argument('--max-fps', type=int, default=60)
+    p.add_argument('--profile', choices=PROFILES, help='Streaming quality preset; overrides size and FPS')
+    p.add_argument('--bit-rate', type=int, default=4_000_000)
     p.add_argument('--parent-pid', type=int, help=argparse.SUPPRESS)
     p.add_argument('--release-on-exit', action='store_true', help='Release this token when the desktop-owned session stops')
     args = parser.parse_args()
