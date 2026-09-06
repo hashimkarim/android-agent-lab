@@ -273,6 +273,48 @@ class ReleaseTests(unittest.TestCase):
                 self.assertNotEqual(0,result.returncode)
                 self.assertIn('Missing repository secret/variable ' + secret,result.stdout)
 
+    def test_homebrew_publisher_accepts_only_the_renamed_tap(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)
+            (path / 'manifest.json').write_text('{"tag":"v0.3.1"}')
+            commands = path / 'commands.log'
+            commands.touch()
+            tools = path / 'bin'
+            tools.mkdir()
+            # Exercise the publisher without containers, network calls or real keys.
+            stubs = {
+                'docker': 'exit 0\n',
+                'python3': 'case "$1" in */recipe-version.py) exit 10 ;; esac\n',
+                'git': 'printf "%s\\n" "$*" >> "$COMMAND_LOG"\n'
+                       'if [ "$1" = clone ]; then mkdir -p "$3"; fi\n',
+            }
+            for name, body in stubs.items():
+                command = tools / name
+                command.write_text('#!/bin/sh\nset -eu\n' + body)
+                command.chmod(0o755)
+            env = {key: value for key, value in os.environ.items()
+                   if not key.startswith('HOMEBREW_') and key != 'GITHUB_STEP_SUMMARY'}
+            env.update(PATH=str(tools) + os.pathsep + os.environ['PATH'],
+                       DRY_RUN='false', RELEASE_TAG='v0.3.1',
+                       HOMEBREW_SSH_PRIVATE_KEY='test key', COMMAND_LOG=str(commands))
+            for tap, accepted in [('hashimkarim/homebrew-tap', True),
+                                  ('Hashim-K/homebrew-tap', False),
+                                  ('someone-else/homebrew-tap', False)]:
+                with self.subTest(tap=tap):
+                    commands.write_text('')
+                    result = subprocess.run(
+                        ['bash', str(ROOT / 'tools/publish/scripts/publish-platform.sh'),
+                         'homebrew', temp], env=env | {'HOMEBREW_TAP_REPOSITORY': tap},
+                        text=True, capture_output=True, timeout=10)
+                    if accepted:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertIn('clone git@github.com:hashimkarim/homebrew-tap.git ',
+                                      commands.read_text())
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn('Unexpected Homebrew destination', result.stderr)
+                        self.assertEqual(commands.read_text(), '')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -106,7 +106,7 @@ case "$platform" in
     fi
     ;;
   homebrew)
-    [[ "$HOMEBREW_TAP_REPOSITORY" == Hashim-K/homebrew-tap ]] || { echo 'Unexpected Homebrew destination' >&2; exit 1; }
+    [[ "$HOMEBREW_TAP_REPOSITORY" == hashimkarim/homebrew-tap ]] || { echo 'Unexpected Homebrew destination' >&2; exit 1; }
     printf '%s\n' "$HOMEBREW_SSH_PRIVATE_KEY" > "$private_dir/key"
     python3 - <<'PY' > "$private_dir/known_hosts"
 import json, urllib.request

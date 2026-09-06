@@ -66,17 +66,17 @@ Debian or to a different Ubuntu series.
 
 Follow [Homebrew's installation prerequisites](https://docs.brew.sh/Installation)
 and its shell setup first. Then install the fully qualified formula from
-[Hashim-K's tap](https://github.com/Hashim-K/homebrew-tap/blob/main/Formula/android-agent-lab.rb):
+[hashimkarim's tap](https://github.com/hashimkarim/homebrew-tap/blob/main/Formula/android-agent-lab.rb):
 
 ```bash
-brew install hashim-k/tap/android-agent-lab
+brew install hashimkarim/tap/android-agent-lab
 android-agent-lab
 ```
 
 Current Homebrew [trusts the named formula](https://docs.brew.sh/Tap-Trust) when
 you use its fully qualified install command. If your version asks for trust,
-review and approve `hashim-k/tap/android-agent-lab` specifically. You can also use
-`brew trust --formula hashim-k/tap/android-agent-lab`; whole-tap trust is unnecessary.
+review and approve `hashimkarim/tap/android-agent-lab` specifically. You can also use
+`brew trust --formula hashimkarim/tap/android-agent-lab`; whole-tap trust is unnecessary.
 
 This formula supports x86_64 and ARM64 Linux desktops. Homebrew installs Python;
 install ADB and the normal GTK 3, NSS, GBM, and ALSA desktop libraries through your
@@ -122,7 +122,7 @@ its video sessions but leaves emulators and their Android data in place.
 | Channel | Upgrade | Remove the app |
 | --- | --- | --- |
 | AUR | `yay -Syu android-agent-lab-bin`, or update and review the cloned recipe with `git pull --ff-only`, then `makepkg -si` | `sudo pacman -R android-agent-lab-bin` |
-| Homebrew | `brew update`, then `brew upgrade hashim-k/tap/android-agent-lab` | `brew uninstall hashim-k/tap/android-agent-lab` |
+| Homebrew | `brew update`, then `brew upgrade hashimkarim/tap/android-agent-lab` | `brew uninstall hashimkarim/tap/android-agent-lab` |
 | COPR | `sudo dnf upgrade android-agent-lab` | `sudo dnf remove android-agent-lab` |
 | PPA | `sudo apt update`, then `sudo apt install --only-upgrade android-agent-lab` | `sudo apt remove android-agent-lab` |
 | Direct DEB / RPM / Arch package | Verify the new download and repeat its installation command | `sudo apt remove android-agent-lab`, `sudo dnf remove android-agent-lab`, or `sudo pacman -R android-agent-lab` respectively |
@@ -137,7 +137,7 @@ packages from a channel, you can also remove its configuration:
 
 ```bash
 # Homebrew: only after removing every formula you use from this shared tap.
-brew untap hashim-k/tap
+brew untap hashimkarim/tap
 # Fedora: remove this COPR repository configuration.
 sudo dnf copr remove hashimkarim/android-agent-lab
 # Ubuntu: remove this PPA and refresh package lists.
@@ -177,7 +177,7 @@ Each platform runs independently and serializes updates to its package repositor
 | Channel | Required validation before upload | Destination |
 | --- | --- | --- |
 | AUR | Unprivileged `makepkg`, generated `.SRCINFO`, package installation and app smoke test | `aur.archlinux.org/android-agent-lab-bin.git`; only `PKGBUILD` and `.SRCINFO` |
-| Homebrew | Install the generated formula in an isolated tap, `brew test`, app smoke test | `Hashim-K/homebrew-tap`, only `Formula/android-agent-lab.rb` |
+| Homebrew | Install the generated formula in an isolated tap, `brew test`, app smoke test | `hashimkarim/homebrew-tap`, only `Formula/android-agent-lab.rb` |
 | COPR | Build the complete SRPM and RPM in Fedora 44, install and smoke-test the RPM | `hashimkarim/android-agent-lab`; existing Fedora 43/44 x86_64 and aarch64 chroots |
 | PPA | Build unsigned source on Ubuntu 24.04, extract its `.dsc`, build/install the binary, app smoke test | Signed source `.changes` to `ppa:hashimkarim/android-agent-lab`, Noble amd64 |
 
@@ -226,7 +226,7 @@ Configure these Actions secrets and variables on the **source** repository:
 | Platform | Secrets | Variables |
 | --- | --- | --- |
 | AUR | `AUR_SSH_PRIVATE_KEY` | `AUR_SSH_KNOWN_HOSTS` (verified host keys) |
-| Homebrew | `HOMEBREW_SSH_PRIVATE_KEY` | `HOMEBREW_TAP_REPOSITORY=Hashim-K/homebrew-tap` |
+| Homebrew | `HOMEBREW_SSH_PRIVATE_KEY` | `HOMEBREW_TAP_REPOSITORY=hashimkarim/homebrew-tap` |
 | COPR | `COPR_CONFIG` (existing copr-cli configuration) | Destination is fixed in the helper |
 | PPA | `PPA_GPG_PRIVATE_KEY`; optional `PPA_GPG_PASSPHRASE` | `PPA_GPG_FINGERPRINT` |
 
