@@ -7,12 +7,12 @@
   "main": "app/main.cjs",
   "author": {
     "name": "Hashim",
-    "url": "https://github.com/Hashim-K"
+    "url": "https://github.com/hashimkarim"
   },
-  "homepage": "https://github.com/Hashim-K/android-agent-lab",
+  "homepage": "https://github.com/hashimkarim/android-agent-lab",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Hashim-K/android-agent-lab.git"
+    "url": "https://github.com/hashimkarim/android-agent-lab.git"
   },
   "license": "MIT",
   "private": true,

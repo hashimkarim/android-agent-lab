@@ -129,11 +129,16 @@ PY
     python3 "$script_dir/publication-state.py" "$platform" "$version" || status=$?
     if [[ "$status" == 2 ]]; then exit 2; fi
     if [[ "$status" != 0 && "$status" != 1 ]]; then exit "$status"; fi
+    if [[ "$platform" == copr ]]; then
+      assert_latest
+      printf '%s\n' "$COPR_CONFIG" > "$private_dir/copr"
+      chmod 600 "$private_dir/copr"
+      timeout 300 python3 "$script_dir/sync-copr-metadata.py" "$private_dir/copr" \
+        hashimkarim/android-agent-lab "$script_dir/../../../packaging/copr/project.json"
+    fi
     if [[ "$status" == 1 ]]; then
       assert_latest
       if [[ "$platform" == copr ]]; then
-        printf '%s\n' "$COPR_CONFIG" > "$private_dir/copr"
-        chmod 600 "$private_dir/copr"
         timeout 300 copr-cli --config "$private_dir/copr" build --nowait hashimkarim/android-agent-lab "$results/"*.src.rpm
       else
         export GNUPGHOME="$private_dir/gpg"

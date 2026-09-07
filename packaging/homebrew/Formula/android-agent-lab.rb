@@ -1,16 +1,16 @@
 class AndroidAgentLab < Formula
   desc "Shared Android devices, scrcpy video, and visible agent cursors"
-  homepage "https://github.com/Hashim-K/android-agent-lab"
+  homepage "https://github.com/hashimkarim/android-agent-lab"
   version "0.2.0"
   license "MIT"
   depends_on :linux
   depends_on "python@3.14"
 
   if Hardware::CPU.arm?
-    url "https://github.com/Hashim-K/android-agent-lab/releases/download/v#{version}/Android-Agent-Lab-#{version}-arm64.tar.gz"
+    url "https://github.com/hashimkarim/android-agent-lab/releases/download/v#{version}/Android-Agent-Lab-#{version}-arm64.tar.gz"
     sha256 "dc57df5fb2c6bbf76baf0352471031d5c7f1f463e1165c2ecb488d48f259e96e"
   else
-    url "https://github.com/Hashim-K/android-agent-lab/releases/download/v#{version}/Android-Agent-Lab-#{version}-x64.tar.gz"
+    url "https://github.com/hashimkarim/android-agent-lab/releases/download/v#{version}/Android-Agent-Lab-#{version}-x64.tar.gz"
     sha256 "fd326e5337cf2f433cf9d6e80b9db03d850a669a1c82174309f32c73ffacb18d"
   end
 

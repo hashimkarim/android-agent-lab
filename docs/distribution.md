@@ -1,7 +1,7 @@
 # Package manager installation
 
 Android Agent Lab is distributed through the project's community package channels
-and [GitHub Releases](https://github.com/Hashim-K/android-agent-lab/releases).
+and [GitHub Releases](https://github.com/hashimkarim/android-agent-lab/releases).
 The desktop app supports x86_64 and ARM64 glibc Linux. The included Docker Android
 16 emulator requires x86_64, Docker with Compose, and `/dev/kvm`; physical Android
 devices and remote ADB servers work with either desktop architecture.
@@ -96,7 +96,7 @@ DEB, which installs the app's AppArmor profile.
 ## AppImage, RPM, DEB and portable downloads
 
 All ten architecture-specific installers remain available from
-[GitHub Releases](https://github.com/Hashim-K/android-agent-lab/releases), with
+[GitHub Releases](https://github.com/hashimkarim/android-agent-lab/releases), with
 `SHA256SUMS` and the user-local AppImage installer. See the
 [desktop guide](desktop.md) for dependencies and installation details.
 
@@ -197,7 +197,7 @@ to the step or uploading packages. Inspect the logs and `publishing-*` artifacts
 After the workflow is on the default branch, a CLI equivalent is:
 
 ```bash
-gh workflow run publish-packages.yml --repo Hashim-K/android-agent-lab \
+gh workflow run publish-packages.yml --repo hashimkarim/android-agent-lab \
   -f tag=v0.2.0 -f platform=all -F dry_run=true
 ```
 
@@ -208,6 +208,14 @@ submissions before uploading. API failures fail the job; they never count as an
 absent package. Pending COPR/PPA submissions are polled with cache revalidation and
 a 45-minute limit. A timeout does not cancel the remote build: check it before retrying.
 Already published versions are reused, and the other channels need not be rerun.
+
+Production COPR runs also synchronize the homepage and description from
+`packaging/copr/project.json`, including retries of an already published version.
+Only changed metadata fields are written; project instructions, build settings,
+permissions, and existing uploads are preserved. This requires project admin
+access and the Python SDK installed with `copr-cli` in the same Python environment.
+Dry runs leave project metadata untouched. Updated AUR, Homebrew and PPA package
+links take effect when the next version is published.
 
 For a failed COPR build, retry the platform job. For a failed Launchpad build, use
 Launchpad's **Retry build** and rerun the PPA job to observe publication. Launchpad
@@ -238,7 +246,7 @@ token invalidates the previous one. Platform secrets never enter the package-tes
 containers or public artifacts; temporary credential files are removed on exit.
 
 Maintainers using the private `linux-deploy` toolkit can preview and install this
-configuration with its `scripts/secrets.py install --repo Hashim-K/android-agent-lab
+configuration with its `scripts/secrets.py install --repo hashimkarim/android-agent-lab
 --platform aur homebrew copr ppa`, then `--apply`. Do not copy its `.env` into this
 repository. Existing credential sets are preserved unless replacement is explicitly
 requested. Fork maintainers must change the recipe URLs, helper destinations and
@@ -255,7 +263,7 @@ platform (the output directory must not exist yet):
 tag=v0.2.0
 staging="$HOME/.cache/android-agent-lab-publishing/$tag"
 python3 tools/publish/scripts/release-info.py "$tag"
-gh release download "$tag" --repo Hashim-K/android-agent-lab \
+gh release download "$tag" --repo hashimkarim/android-agent-lab \
   --pattern '*.tar.gz' --pattern SHA256SUMS --dir "$staging/assets"
 python3 scripts/prepare_distribution.py --tag "$tag" \
   --assets "$staging/assets" --output "$staging/prepared"

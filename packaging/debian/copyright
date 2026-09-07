@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: android-agent-lab
-Source: https://github.com/Hashim-K/android-agent-lab
+Source: https://github.com/hashimkarim/android-agent-lab
 Comment: This package redistributes the verified upstream desktop bundles.
  Electron and Chromium notices are preserved in /opt/android-agent-lab/
  LICENSE.electron.txt and LICENSES.chromium.html. Further dependency notices

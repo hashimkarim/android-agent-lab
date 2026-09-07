@@ -147,6 +147,14 @@ class ArchiveTests(unittest.TestCase):
         for arch in ['x64','arm64']:
             self.assertIn(manifest['archives'][arch]['sha256'], formula)
         self.assertIn('Version:        9.8.7', (dest / 'rpm/SPECS/android-agent-lab.spec').read_text())
+        for recipe_path in ['aur/PKGBUILD', 'homebrew/Formula/android-agent-lab.rb',
+                            'rpm/SPECS/android-agent-lab.spec',
+                            'ppa/android-agent-lab-9.8.7/debian/control',
+                            'ppa/android-agent-lab-9.8.7/debian/copyright']:
+            with self.subTest(recipe=recipe_path):
+                content = (dest / recipe_path).read_text()
+                self.assertIn('https://github.com/hashimkarim/android-agent-lab', content)
+                self.assertNotIn('github.com/Hashim-K/', content)
         self.assertEqual((dest / 'rpm/SOURCES/android-agent-lab.png').read_bytes(), b'PNG fixture')
         self.assertIn('(9.8.7-1ppa1) noble;', (dest / 'ppa/android-agent-lab-9.8.7/debian/changelog').read_text())
         with self.assertRaises(FileExistsError):
@@ -234,6 +242,12 @@ class PublicationTests(unittest.TestCase):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_release_api_uses_canonical_repository(self):
+        with patch('urllib.request.urlopen', return_value=contextlib.nullcontext(io.StringIO('{}'))) as request:
+            release.get('releases/latest')
+            self.assertEqual(request.call_args.args[0].full_url,
+                             'https://api.github.com/repos/hashimkarim/android-agent-lab/releases/latest')
+
     def metadata(self, **overrides):
         result = dict(tag_name='v0.3.1', draft=False, prerelease=False, assets=[{'name':name} for name in [
             'SHA256SUMS','Android-Agent-Lab-0.3.1-x64.tar.gz','Android-Agent-Lab-0.3.1-arm64.tar.gz']])

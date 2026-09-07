@@ -4,7 +4,7 @@ pkgver=0.2.0
 pkgrel=1
 pkgdesc='Shared Android devices, scrcpy video, and visible agent cursors'
 arch=('x86_64' 'aarch64')
-url='https://github.com/Hashim-K/android-agent-lab'
+url='https://github.com/hashimkarim/android-agent-lab'
 license=('MIT')
 depends=('python' 'android-tools' 'avahi' 'gtk3' 'nss' 'libxss' 'libxtst' 'xdg-utils'
          'at-spi2-core' 'util-linux-libs' 'libsecret' 'libglvnd' 'mesa' 'alsa-lib')

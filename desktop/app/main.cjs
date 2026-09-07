@@ -251,7 +251,7 @@ const actions = {
   },
   reservation: setReservation,
   installSkill,
-  docs: () => { shell.openExternal('https://github.com/Hashim-K/android-agent-lab/blob/main/docs/desktop.md'); return {ok: true}; },
+  docs: () => { shell.openExternal('https://github.com/hashimkarim/android-agent-lab/blob/main/docs/desktop.md'); return {ok: true}; },
 };
 function requiredSession(id) { const s = sessions.get(id); if (!s || !s.url) throw new Error('This session is not ready or has ended.'); return s; }
 

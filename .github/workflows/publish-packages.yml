@@ -92,7 +92,7 @@ jobs:
         run: |
           echo "PREPARED=$RUNNER_TEMP/prepared" >> "$GITHUB_ENV"
           python3 tools/publish/scripts/release-info.py "$RELEASE_TAG"
-          gh release download "$RELEASE_TAG" --repo Hashim-K/android-agent-lab \
+          gh release download "$RELEASE_TAG" --repo hashimkarim/android-agent-lab \
             --pattern "Android-Agent-Lab-${RELEASE_TAG#v}-x64.tar.gz" \
             --pattern "Android-Agent-Lab-${RELEASE_TAG#v}-arm64.tar.gz" \
             --pattern SHA256SUMS --dir "$RUNNER_TEMP/assets"

@@ -9,7 +9,7 @@ import urllib.request
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'scripts'))
 from prepare_distribution import stable_version
 
-REPOSITORY = 'Hashim-K/android-agent-lab'
+REPOSITORY = 'hashimkarim/android-agent-lab'
 
 
 def get(path):
